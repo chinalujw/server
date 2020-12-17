@@ -2,6 +2,8 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Julius Härtl <jus@bitgrid.net>
+ * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
@@ -18,13 +20,17 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
 namespace OC\Files\Storage\Wrapper;
 
 use OC\Files\Cache\Wrapper\CacheJail;
+use OC\Files\Cache\Wrapper\JailPropagator;
+use OC\Files\Filesystem;
+use OCP\Files\Storage\IStorage;
+use OCP\Files\Storage\IWriteStreamStorage;
 use OCP\Lock\ILockingProvider;
 
 /**
@@ -50,10 +56,25 @@ class Jail extends Wrapper {
 	}
 
 	public function getUnjailedPath($path) {
-		if ($path === '') {
-			return $this->rootPath;
+		return trim(Filesystem::normalizePath($this->rootPath . '/' . $path), '/');
+	}
+
+	/**
+	 * This is separate from Wrapper::getWrapperStorage so we can get the jailed storage consistently even if the jail is inside another wrapper
+	 */
+	public function getUnjailedStorage() {
+		return $this->storage;
+	}
+
+
+	public function getJailedPath($path) {
+		$root = rtrim($this->rootPath, '/') . '/';
+
+		if ($path !== $this->rootPath && strpos($path, $root) !== 0) {
+			return null;
 		} else {
-			return $this->rootPath . '/' . $path;
+			$path = substr($path, strlen($this->rootPath));
+			return trim($path, '/');
 		}
 	}
 
@@ -464,12 +485,12 @@ class Jail extends Wrapper {
 	}
 
 	/**
-	 * @param \OCP\Files\Storage $sourceStorage
+	 * @param IStorage $sourceStorage
 	 * @param string $sourceInternalPath
 	 * @param string $targetInternalPath
 	 * @return bool
 	 */
-	public function copyFromStorage(\OCP\Files\Storage $sourceStorage, $sourceInternalPath, $targetInternalPath) {
+	public function copyFromStorage(IStorage $sourceStorage, $sourceInternalPath, $targetInternalPath) {
 		if ($sourceStorage === $this) {
 			return $this->copy($sourceInternalPath, $targetInternalPath);
 		}
@@ -477,15 +498,45 @@ class Jail extends Wrapper {
 	}
 
 	/**
-	 * @param \OCP\Files\Storage $sourceStorage
+	 * @param IStorage $sourceStorage
 	 * @param string $sourceInternalPath
 	 * @param string $targetInternalPath
 	 * @return bool
 	 */
-	public function moveFromStorage(\OCP\Files\Storage $sourceStorage, $sourceInternalPath, $targetInternalPath) {
+	public function moveFromStorage(IStorage $sourceStorage, $sourceInternalPath, $targetInternalPath) {
 		if ($sourceStorage === $this) {
 			return $this->rename($sourceInternalPath, $targetInternalPath);
 		}
 		return $this->getWrapperStorage()->moveFromStorage($sourceStorage, $sourceInternalPath, $this->getUnjailedPath($targetInternalPath));
+	}
+
+	public function getPropagator($storage = null) {
+		if (isset($this->propagator)) {
+			return $this->propagator;
+		}
+
+		if (!$storage) {
+			$storage = $this;
+		}
+		$this->propagator = new JailPropagator($storage, \OC::$server->getDatabaseConnection());
+		return $this->propagator;
+	}
+
+	public function writeStream(string $path, $stream, int $size = null): int {
+		$storage = $this->getWrapperStorage();
+		if ($storage->instanceOfStorage(IWriteStreamStorage::class)) {
+			/** @var IWriteStreamStorage $storage */
+			return $storage->writeStream($this->getUnjailedPath($path), $stream, $size);
+		} else {
+			$target = $this->fopen($path, 'w');
+			list($count, $result) = \OC_Helper::streamCopy($stream, $target);
+			fclose($stream);
+			fclose($target);
+			return $count;
+		}
+	}
+
+	public function getDirectoryContent($directory): \Traversable {
+		return $this->getWrapperStorage()->getDirectoryContent($this->getUnjailedPath($directory));
 	}
 }

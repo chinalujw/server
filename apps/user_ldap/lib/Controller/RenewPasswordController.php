@@ -2,6 +2,7 @@
 /**
  * @copyright Copyright (c) 2017 Roger Szabo <roger.szabo@web.de>
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Roger Szabo <roger.szabo@web.de>
  *
  * @license GNU AGPL version 3 or any later version
@@ -17,14 +18,13 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 namespace OCA\User_LDAP\Controller;
 
 use OC\HintException;
-use OC_Util;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\AppFramework\Http\TemplateResponse;
@@ -55,7 +55,7 @@ class RenewPasswordController extends Controller {
 	 * @param IConfig $config
 	 * @param IURLGenerator $urlGenerator
 	 */
-	function __construct($appName, IRequest $request, IUserManager $userManager, 
+	public function __construct($appName, IRequest $request, IUserManager $userManager,
 		IConfig $config, IL10N $l10n, ISession $session, IURLGenerator $urlGenerator) {
 		parent::__construct($appName, $request);
 		$this->userManager = $userManager;
@@ -85,7 +85,7 @@ class RenewPasswordController extends Controller {
 	 * @return TemplateResponse|RedirectResponse
 	 */
 	public function showRenewPasswordForm($user) {
-		if($this->config->getUserValue($user, 'user_ldap', 'needsPasswordReset') !== 'true') {
+		if ($this->config->getUserValue($user, 'user_ldap', 'needsPasswordReset') !== 'true') {
 			return new RedirectResponse($this->urlGenerator->linkToRouteAbsolute('core.login.showLoginForm'));
 		}
 		$parameters = [];
@@ -129,7 +129,7 @@ class RenewPasswordController extends Controller {
 	 * @return RedirectResponse
 	 */
 	public function tryRenewPassword($user, $oldPassword, $newPassword) {
-		if($this->config->getUserValue($user, 'user_ldap', 'needsPasswordReset') !== 'true') {
+		if ($this->config->getUserValue($user, 'user_ldap', 'needsPasswordReset') !== 'true') {
 			return new RedirectResponse($this->urlGenerator->linkToRouteAbsolute('core.login.showLoginForm'));
 		}
 		$args = !is_null($user) ? ['user' => $user] : [];
@@ -146,7 +146,7 @@ class RenewPasswordController extends Controller {
 				$this->session->set('loginMessages', [
 					[], [$this->l10n->t("Please login with the new password")]
 				]);
-				$this->session->remove('needPasswordRenewal');
+				$this->config->setUserValue($user, 'user_ldap', 'needsPasswordReset', 'false');
 				return new RedirectResponse($this->urlGenerator->linkToRoute('core.login.showLoginForm', $args));
 			} else {
 				$this->session->set('renewPasswordMessages', [
@@ -176,5 +176,4 @@ class RenewPasswordController extends Controller {
 		]);
 		return new RedirectResponse($this->urlGenerator->linkToRoute('core.login.showLoginForm', $args));
 	}
-
 }

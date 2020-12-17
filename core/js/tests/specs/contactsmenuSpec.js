@@ -72,7 +72,7 @@ describe('Contacts menu', function() {
 		fakeServer.respond();
 
 		opening.then(function() {
-			expect($menuEl.html()).toContain('There was an error loading your contacts');
+			expect($menuEl.html()).toContain('Could not load your contacts');
 			expect(console.error).toHaveBeenCalledTimes(1);
 			done();
 		}, function(e) {
@@ -243,13 +243,13 @@ describe('Contacts menu', function() {
 
 			// Open the first one
 			$menuEl.find('.contact').eq(0).find('.other-actions').click();
-			expect($menuEl.find('.contact').eq(0).find('.menu').css('display')).toBe('block');
+			expect($menuEl.find('.contact').eq(0).find('.menu').css('display')).toBe('');
 			expect($menuEl.find('.contact').eq(1).find('.menu').css('display')).toBe('none');
 
 			// Open the second one
 			$menuEl.find('.contact').eq(1).find('.other-actions').click();
 			expect($menuEl.find('.contact').eq(0).find('.menu').css('display')).toBe('none');
-			expect($menuEl.find('.contact').eq(1).find('.menu').css('display')).toBe('block');
+			expect($menuEl.find('.contact').eq(1).find('.menu').css('display')).toBe('');
 
 			// Close the second one
 			$menuEl.find('.contact').eq(1).find('.other-actions').click();

@@ -2,13 +2,17 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
  * @author Björn Schießle <bjoern@schiessle.org>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Daniel Kesselberg <mail@danielkesselberg.de>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
- * @author Vincent Petry <pvince81@owncloud.com>
+ * @author Vincent Petry <vincent@nextcloud.com>
  *
  * @license AGPL-3.0
  *
@@ -22,7 +26,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -30,16 +34,19 @@ namespace OCA\Files_Sharing\External;
 
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
 use OC\Files\Storage\DAV;
 use OC\ForbiddenException;
 use OCA\Files_Sharing\ISharedStorage;
 use OCP\AppFramework\Http;
+use OCP\Constants;
 use OCP\Federation\ICloudId;
 use OCP\Files\NotFoundException;
+use OCP\Files\Storage\IDisableEncryptionStorage;
 use OCP\Files\StorageInvalidException;
 use OCP\Files\StorageNotAvailableException;
 
-class Storage extends DAV implements ISharedStorage {
+class Storage extends DAV implements ISharedStorage, IDisableEncryptionStorage {
 	/** @var ICloudId */
 	private $cloudId;
 	/** @var string */
@@ -80,13 +87,13 @@ class Storage extends DAV implements ISharedStorage {
 		$this->mountPoint = $options['mountpoint'];
 		$this->token = $options['token'];
 
-		parent::__construct(array(
+		parent::__construct([
 			'secure' => $secure,
 			'host' => $host,
 			'root' => $root,
 			'user' => $options['token'],
 			'password' => (string)$options['password']
-		));
+		]);
 	}
 
 	public function getWatcher($path = '', $storage = null) {
@@ -259,8 +266,8 @@ class Storage extends DAV implements ISharedStorage {
 	 * @return bool
 	 */
 	private function testRemoteUrl($url) {
-		$cache = $this->memcacheFactory->create('files_sharing_remote_url');
-		if($cache->hasKey($url)) {
+		$cache = $this->memcacheFactory->createDistributed('files_sharing_remote_url');
+		if ($cache->hasKey($url)) {
 			return (bool)$cache->get($url);
 		}
 
@@ -276,9 +283,11 @@ class Storage extends DAV implements ISharedStorage {
 			$returnValue = false;
 		} catch (ClientException $e) {
 			$returnValue = false;
+		} catch (RequestException $e) {
+			$returnValue = false;
 		}
 
-		$cache->set($url, $returnValue);
+		$cache->set($url, $returnValue, 60 * 60 * 24);
 		return $returnValue;
 	}
 
@@ -289,7 +298,7 @@ class Storage extends DAV implements ISharedStorage {
 	 * @return bool
 	 */
 	public function remoteIsOwnCloud() {
-		if(defined('PHPUNIT_RUN') || !$this->testRemoteUrl($this->getRemote() . '/status.php')) {
+		if (defined('PHPUNIT_RUN') || !$this->testRemoteUrl($this->getRemote() . '/status.php')) {
 			return false;
 		}
 		return true;
@@ -307,7 +316,7 @@ class Storage extends DAV implements ISharedStorage {
 		$password = $this->getPassword();
 
 		// If remote is not an ownCloud do not try to get any share info
-		if(!$this->remoteIsOwnCloud()) {
+		if (!$this->remoteIsOwnCloud()) {
 			return ['status' => 'unsupported'];
 		}
 
@@ -345,23 +354,75 @@ class Storage extends DAV implements ISharedStorage {
 		if (\OCP\Util::isSharingDisabledForUser() || !\OC\Share\Share::isResharingAllowed()) {
 			return false;
 		}
-		return ($this->getPermissions($path) & \OCP\Constants::PERMISSION_SHARE);
+		return ($this->getPermissions($path) & Constants::PERMISSION_SHARE);
 	}
 
 	public function getPermissions($path) {
 		$response = $this->propfind($path);
+		// old federated sharing permissions
 		if (isset($response['{http://open-collaboration-services.org/ns}share-permissions'])) {
 			$permissions = $response['{http://open-collaboration-services.org/ns}share-permissions'];
+		} elseif (isset($response['{http://open-cloud-mesh.org/ns}share-permissions'])) {
+			// permissions provided by the OCM API
+			$permissions = $this->ocmPermissions2ncPermissions($response['{http://open-collaboration-services.org/ns}share-permissions'], $path);
 		} else {
 			// use default permission if remote server doesn't provide the share permissions
-			if ($this->is_dir($path)) {
-				$permissions = \OCP\Constants::PERMISSION_ALL;
-			} else {
-				$permissions = \OCP\Constants::PERMISSION_ALL & ~\OCP\Constants::PERMISSION_CREATE;
-			}
+			$permissions = $this->getDefaultPermissions($path);
 		}
 
 		return $permissions;
 	}
 
+	public function needsPartFile() {
+		return false;
+	}
+
+	/**
+	 * translate OCM Permissions to Nextcloud permissions
+	 *
+	 * @param string $ocmPermissions json encoded OCM permissions
+	 * @param string $path path to file
+	 * @return int
+	 */
+	protected function ocmPermissions2ncPermissions($ocmPermissions, $path) {
+		try {
+			$ocmPermissions = json_decode($ocmPermissions);
+			$ncPermissions = 0;
+			foreach ($ocmPermissions as $permission) {
+				switch (strtolower($permission)) {
+					case 'read':
+						$ncPermissions += Constants::PERMISSION_READ;
+						break;
+					case 'write':
+						$ncPermissions += Constants::PERMISSION_CREATE + Constants::PERMISSION_UPDATE;
+						break;
+					case 'share':
+						$ncPermissions += Constants::PERMISSION_SHARE;
+						break;
+					default:
+						throw new \Exception();
+				}
+			}
+		} catch (\Exception $e) {
+			$ncPermissions = $this->getDefaultPermissions($path);
+		}
+
+		return $ncPermissions;
+	}
+
+	/**
+	 * calculate default permissions in case no permissions are provided
+	 *
+	 * @param $path
+	 * @return int
+	 */
+	protected function getDefaultPermissions($path) {
+		if ($this->is_dir($path)) {
+			$permissions = Constants::PERMISSION_ALL;
+		} else {
+			$permissions = Constants::PERMISSION_ALL & ~Constants::PERMISSION_CREATE;
+		}
+
+		return $permissions;
+	}
 }

@@ -14,6 +14,7 @@ use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\L10N\ILanguageIterator;
 use Test\TestCase;
 
 /**
@@ -23,19 +24,19 @@ use Test\TestCase;
  */
 class FactoryTest extends TestCase {
 
-	/** @var IConfig|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	protected $config;
 
-	/** @var IRequest|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	protected $request;
 
-	/** @var IUserSession|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IUserSession|\PHPUnit\Framework\MockObject\MockObject */
 	protected $userSession;
 
 	/** @var string */
 	protected $serverRoot;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->config = $this->getMockBuilder(IConfig::class)
@@ -55,9 +56,16 @@ class FactoryTest extends TestCase {
 
 	/**
 	 * @param array $methods
-	 * @return Factory|\PHPUnit_Framework_MockObject_MockObject
+	 * @param bool $mockRequestGetHeaderMethod
+	 * @return Factory|\PHPUnit\Framework\MockObject\MockObject
 	 */
-	protected function getFactory(array $methods = []) {
+	protected function getFactory(array $methods = [], $mockRequestGetHeaderMethod = false) {
+		if ($mockRequestGetHeaderMethod) {
+			$this->request->expects($this->any())
+				->method('getHeader')
+				->willReturn('');
+		}
+
 		if (!empty($methods)) {
 			return $this->getMockBuilder(Factory::class)
 				->setConstructorArgs([
@@ -110,7 +118,12 @@ class FactoryTest extends TestCase {
 				->with('MyApp', 'de')
 				->willReturn(false);
 		$this->config
-			->expects($this->once())
+			->expects($this->at(0))
+			->method('getSystemValue')
+			->with('force_language', false)
+			->willReturn(false);
+		$this->config
+			->expects($this->at(1))
 			->method('getSystemValue')
 			->with('installed', false)
 			->willReturn(true);
@@ -137,14 +150,19 @@ class FactoryTest extends TestCase {
 	}
 
 	public function testFindLanguageWithNotExistingRequestLanguageAndNotExistingStoredUserLanguage() {
-		$factory = $this->getFactory(['languageExists']);
+		$factory = $this->getFactory(['languageExists'], true);
 		$this->invokePrivate($factory, 'requestLanguage', ['de']);
 		$factory->expects($this->at(0))
 				->method('languageExists')
 				->with('MyApp', 'de')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(0))
+			->expects($this->at(0))
+			->method('getSystemValue')
+			->with('force_language', false)
+			->willReturn(false);
+		$this->config
+				->expects($this->at(1))
 				->method('getSystemValue')
 				->with('installed', false)
 				->willReturn(true);
@@ -167,7 +185,7 @@ class FactoryTest extends TestCase {
 				->with('MyApp', 'jp')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(2))
+				->expects($this->at(3))
 				->method('getSystemValue')
 				->with('default_language', false)
 				->willReturn('es');
@@ -180,14 +198,19 @@ class FactoryTest extends TestCase {
 	}
 
 	public function testFindLanguageWithNotExistingRequestLanguageAndNotExistingStoredUserLanguageAndNotExistingDefault() {
-		$factory = $this->getFactory(['languageExists']);
+		$factory = $this->getFactory(['languageExists'], true);
 		$this->invokePrivate($factory, 'requestLanguage', ['de']);
 		$factory->expects($this->at(0))
 				->method('languageExists')
 				->with('MyApp', 'de')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(0))
+			->expects($this->at(0))
+			->method('getSystemValue')
+			->with('force_language', false)
+			->willReturn(false);
+		$this->config
+				->expects($this->at(1))
 				->method('getSystemValue')
 				->with('installed', false)
 				->willReturn(true);
@@ -210,7 +233,7 @@ class FactoryTest extends TestCase {
 				->with('MyApp', 'jp')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(2))
+				->expects($this->at(3))
 				->method('getSystemValue')
 				->with('default_language', false)
 				->willReturn('es');
@@ -226,14 +249,19 @@ class FactoryTest extends TestCase {
 	}
 
 	public function testFindLanguageWithNotExistingRequestLanguageAndNotExistingStoredUserLanguageAndNotExistingDefaultAndNoAppInScope() {
-		$factory = $this->getFactory(['languageExists']);
+		$factory = $this->getFactory(['languageExists'], true);
 		$this->invokePrivate($factory, 'requestLanguage', ['de']);
 		$factory->expects($this->at(0))
 				->method('languageExists')
 				->with('MyApp', 'de')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(0))
+			->expects($this->at(0))
+			->method('getSystemValue')
+			->with('force_language', false)
+			->willReturn(false);
+		$this->config
+				->expects($this->at(1))
 				->method('getSystemValue')
 				->with('installed', false)
 				->willReturn(true);
@@ -256,7 +284,7 @@ class FactoryTest extends TestCase {
 				->with('MyApp', 'jp')
 				->willReturn(false);
 		$this->config
-				->expects($this->at(2))
+				->expects($this->at(3))
 				->method('getSystemValue')
 				->with('default_language', false)
 				->willReturn('es');
@@ -273,6 +301,22 @@ class FactoryTest extends TestCase {
 		$this->assertSame('en', $factory->findLanguage('MyApp'));
 	}
 
+	public function testFindLanguageWithForcedLanguage() {
+		$factory = $this->getFactory(['languageExists']);
+		$this->config
+			->expects($this->at(0))
+			->method('getSystemValue')
+			->with('force_language', false)
+			->willReturn('de');
+
+		$factory->expects($this->once())
+			->method('languageExists')
+			->with('MyApp', 'de')
+			->willReturn(true);
+
+		$this->assertSame('de', $factory->findLanguage('MyApp'));
+	}
+
 	/**
 	 * @dataProvider dataFindAvailableLanguages
 	 *
@@ -285,7 +329,7 @@ class FactoryTest extends TestCase {
 			->with($app)
 			->willReturn(\OC::$SERVERROOT . '/tests/data/l10n/');
 
-		$this->assertEquals(['cs', 'de', 'en', 'ru'], $factory->findAvailableLanguages($app), '', 0.0, 10, true);
+		$this->assertEqualsCanonicalizing(['cs', 'de', 'en', 'ru'], $factory->findAvailableLanguages($app));
 	}
 
 	public function dataLanguageExists() {
@@ -316,7 +360,7 @@ class FactoryTest extends TestCase {
 			->with('theme')
 			->willReturn('abc');
 
-		$this->assertEquals(['en', 'zz'], $factory->findAvailableLanguages($app), '', 0.0, 10, true);
+		$this->assertEqualsCanonicalizing(['en', 'zz'], $factory->findAvailableLanguages($app));
 	}
 
 	/**
@@ -368,11 +412,16 @@ class FactoryTest extends TestCase {
 	 * @param string $expected
 	 */
 	public function testGetLanguageFromRequest($app, $header, array $availableLanguages, $expected) {
-		$factory = $this->getFactory(['findAvailableLanguages']);
+		$factory = $this->getFactory(['findAvailableLanguages', 'respectDefaultLanguage']);
 		$factory->expects($this->once())
 			->method('findAvailableLanguages')
 			->with($app)
 			->willReturn($availableLanguages);
+
+		$factory->expects($this->any())
+			->method('respectDefaultLanguage')->willReturnCallback(function ($app, $lang) {
+				return $lang;
+			});
 
 		$this->request->expects($this->once())
 			->method('getHeader')
@@ -380,7 +429,7 @@ class FactoryTest extends TestCase {
 			->willReturn($header);
 
 		if ($expected instanceof LanguageNotFoundException) {
-			$this->setExpectedException(LanguageNotFoundException::class);
+			$this->expectException(LanguageNotFoundException::class);
 			self::invokePrivate($factory, 'getLanguageFromRequest', [$app]);
 		} else {
 			$this->assertSame($expected, self::invokePrivate($factory, 'getLanguageFromRequest', [$app]), 'Asserting returned language');
@@ -392,7 +441,7 @@ class FactoryTest extends TestCase {
 			[null, 'de', [\OC::$SERVERROOT . '/core/l10n/de.json']],
 			['core', 'ru', [\OC::$SERVERROOT . '/core/l10n/ru.json']],
 			['lib', 'ru', [\OC::$SERVERROOT . '/lib/l10n/ru.json']],
-			['settings', 'de', [\OC::$SERVERROOT . '/settings/l10n/de.json']],
+			['settings', 'de', [\OC::$SERVERROOT . '/apps/settings/l10n/de.json']],
 			['files', 'de', [\OC::$SERVERROOT . '/apps/files/l10n/de.json']],
 			['files', '_lang_never_exists_', []],
 			['_app_never_exists_', 'de', [\OC::$SERVERROOT . '/core/l10n/de.json']],
@@ -415,7 +464,7 @@ class FactoryTest extends TestCase {
 			[null, \OC::$SERVERROOT . '/core/l10n/'],
 			['core', \OC::$SERVERROOT . '/core/l10n/'],
 			['lib', \OC::$SERVERROOT . '/lib/l10n/'],
-			['settings', \OC::$SERVERROOT . '/settings/l10n/'],
+			['settings', \OC::$SERVERROOT . '/apps/settings/l10n/'],
 			['files', \OC::$SERVERROOT . '/apps/files/l10n/'],
 			['_app_never_exists_', \OC::$SERVERROOT . '/core/l10n/'],
 		];
@@ -430,33 +479,6 @@ class FactoryTest extends TestCase {
 	public function testFindL10NDir($app, $expected) {
 		$factory = $this->getFactory();
 		$this->assertSame($expected, $this->invokePrivate($factory, 'findL10nDir', [$app]));
-	}
-
-	public function dataCreatePluralFunction() {
-		return [
-			['nplurals=2; plural=(n != 1);', 0, 1],
-			['nplurals=2; plural=(n != 1);', 1, 0],
-			['nplurals=2; plural=(n != 1);', 2, 1],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 0, 2],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 1, 0],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 2, 1],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 3, 1],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 4, 1],
-			['nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;', 5, 2],
-		];
-	}
-
-	/**
-	 * @dataProvider dataCreatePluralFunction
-	 *
-	 * @param string $function
-	 * @param int $count
-	 * @param int $expected
-	 */
-	public function testCreatePluralFunction($function, $count, $expected) {
-		$factory = $this->getFactory();
-		$fn = $factory->createPluralFunction($function);
-		$this->assertEquals($expected, $fn($count));
 	}
 
 	public function dataFindLanguage() {
@@ -488,15 +510,15 @@ class FactoryTest extends TestCase {
 
 		$this->config->expects($this->any())
 			->method('getSystemValue')
-			->will($this->returnCallback(function($var, $default) use ($defaultLang) {
+			->willReturnCallback(function ($var, $default) use ($defaultLang) {
 				if ($var === 'installed') {
 					return true;
-				} else if ($var === 'default_language') {
+				} elseif ($var === 'default_language') {
 					return $defaultLang;
 				} else {
 					return $default;
 				}
-			}));
+			});
 
 		if ($loggedIn) {
 			$user = $this->getMockBuilder(IUser::class)
@@ -524,20 +546,82 @@ class FactoryTest extends TestCase {
 			->with($this->equalTo('ACCEPT_LANGUAGE'))
 			->willReturn($browserLang);
 
-		$factory = $this->getFactory(['languageExists', 'findAvailableLanguages']);
+		$factory = $this->getFactory(['languageExists', 'findAvailableLanguages', 'respectDefaultLanguage']);
 		$factory->expects($this->any())
 			->method('languageExists')
-			->will($this->returnCallback(function ($app, $lang) use ($availableLang) {
+			->willReturnCallback(function ($app, $lang) use ($availableLang) {
 				return in_array($lang, $availableLang);
-			}));
+			});
 		$factory->expects($this->any())
 			->method('findAvailableLanguages')
-			->will($this->returnCallback(function ($app) use ($availableLang) {
+			->willReturnCallback(function ($app) use ($availableLang) {
 				return $availableLang;
-			}));
+			});
+		$factory->expects($this->any())
+			->method('respectDefaultLanguage')->willReturnCallback(function ($app, $lang) {
+				return $lang;
+			});
 
 		$lang = $factory->findLanguage(null);
 		$this->assertSame($expected, $lang);
+	}
 
+	public function dataTestRespectDefaultLanguage() {
+		return [
+			['de', 'de_DE', true, 'de_DE'],
+			['de', 'de', true, 'de'],
+			['de', false, true, 'de'],
+			['fr', 'de_DE', true, 'fr'],
+		];
+	}
+
+	/**
+	 * test if we respect default language if possible
+	 *
+	 * @dataProvider dataTestRespectDefaultLanguage
+	 *
+	 * @param string $lang
+	 * @param string $defaultLanguage
+	 * @param bool $langExists
+	 * @param string $expected
+	 */
+	public function testRespectDefaultLanguage($lang, $defaultLanguage, $langExists, $expected) {
+		$factory = $this->getFactory(['languageExists']);
+		$factory->expects($this->any())
+			->method('languageExists')->willReturn($langExists);
+		$this->config->expects($this->any())
+			->method('getSystemValue')->with('default_language', false)->willReturn($defaultLanguage);
+
+		$result = $this->invokePrivate($factory, 'respectDefaultLanguage', ['app', $lang]);
+		$this->assertSame($expected, $result);
+	}
+
+	public function languageIteratorRequestProvider():array {
+		return [
+			[ true, $this->createMock(IUser::class)],
+			[ false, $this->createMock(IUser::class)],
+			[ false, null]
+		];
+	}
+
+	/**
+	 * @dataProvider languageIteratorRequestProvider
+	 */
+	public function testGetLanguageIterator(bool $hasSession, IUser $iUserMock = null) {
+		$factory = $this->getFactory();
+
+		if ($iUserMock === null) {
+			$matcher = $this->userSession->expects($this->once())
+				->method('getUser');
+
+			if ($hasSession) {
+				$matcher->willReturn($this->createMock(IUser::class));
+			} else {
+				$this->expectException(\RuntimeException::class);
+			}
+		}
+
+		$iterator = $factory->getLanguageIterator($iUserMock);
+		$this->assertInstanceOf(ILanguageIterator::class, $iterator);
 	}
 }

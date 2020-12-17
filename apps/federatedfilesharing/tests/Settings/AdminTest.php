@@ -2,7 +2,10 @@
 /**
  * @copyright Copyright (c) 2016 Lukas Reschke <lukas@statuscode.ch>
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
  * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -17,12 +20,13 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 namespace OCA\FederatedFileSharing\Tests\Settings;
 
+use OCA\FederatedFileSharing\FederatedShareProvider;
 use OCA\FederatedFileSharing\Settings\Admin;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\GlobalScale\IConfig;
@@ -33,14 +37,13 @@ class AdminTest extends TestCase {
 	private $admin;
 	/** @var \OCA\FederatedFileSharing\FederatedShareProvider */
 	private $federatedShareProvider;
-	/** @var  IConfig|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var  IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	private $gsConfig;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
-		$this->federatedShareProvider = $this->getMockBuilder('\OCA\FederatedFileSharing\FederatedShareProvider')
-			->disableOriginalConstructor()->getMock();
-		$this->gsConfig = $this->getMock(IConfig::class);
+		$this->federatedShareProvider = $this->createMock(FederatedShareProvider::class);
+		$this->gsConfig = $this->createMock(IConfig::class);
 		$this->admin = new Admin(
 			$this->federatedShareProvider,
 			$this->gsConfig
@@ -73,11 +76,27 @@ class AdminTest extends TestCase {
 			->willReturn($state);
 		$this->federatedShareProvider
 			->expects($this->once())
+			->method('isIncomingServer2serverShareEnabled')
+			->willReturn($state);
+		$this->federatedShareProvider
+			->expects($this->once())
 			->method('isLookupServerQueriesEnabled')
 			->willReturn($state);
 		$this->federatedShareProvider
 			->expects($this->once())
 			->method('isLookupServerUploadEnabled')
+			->willReturn($state);
+		$this->federatedShareProvider
+			->expects($this->once())
+			->method('isFederatedGroupSharingSupported')
+			->willReturn($state);
+		$this->federatedShareProvider
+			->expects($this->once())
+			->method('isOutgoingServer2serverGroupShareEnabled')
+			->willReturn($state);
+		$this->federatedShareProvider
+			->expects($this->once())
+			->method('isIncomingServer2serverGroupShareEnabled')
 			->willReturn($state);
 		$this->gsConfig->expects($this->once())->method('onlyInternalFederation')
 			->willReturn($state);
@@ -87,7 +106,10 @@ class AdminTest extends TestCase {
 			'outgoingServer2serverShareEnabled' => $state,
 			'incomingServer2serverShareEnabled' => $state,
 			'lookupServerEnabled' => $state,
-			'lookupServerUploadEnabled' => $state
+			'lookupServerUploadEnabled' => $state,
+			'federatedGroupSharingSupported' => $state,
+			'outgoingServer2serverGroupShareEnabled' => $state,
+			'incomingServer2serverGroupShareEnabled' => $state,
 		];
 		$expected = new TemplateResponse('federatedfilesharing', 'settings-admin', $params, '');
 		$this->assertEquals($expected, $this->admin->getForm());

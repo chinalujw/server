@@ -2,8 +2,11 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
  * @author Björn Schießle <bjoern@schiessle.org>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
@@ -20,10 +23,9 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
-
 
 namespace OCA\Federation\Controller;
 
@@ -32,6 +34,7 @@ use OCA\Federation\TrustedServers;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\OCS\OCSForbiddenException;
 use OCP\AppFramework\OCSController;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\IJobList;
 use OCP\ILogger;
 use OCP\IRequest;
@@ -44,7 +47,7 @@ use OCP\Security\ISecureRandom;
  *
  * @package OCA\Federation\Controller
  */
-class OCSAuthAPIController extends OCSController{
+class OCSAuthAPIController extends OCSController {
 
 	/** @var ISecureRandom  */
 	private $secureRandom;
@@ -61,6 +64,9 @@ class OCSAuthAPIController extends OCSController{
 	/** @var ILogger */
 	private $logger;
 
+	/** @var ITimeFactory */
+	private $timeFactory;
+
 	/**
 	 * OCSAuthAPI constructor.
 	 *
@@ -71,6 +77,7 @@ class OCSAuthAPIController extends OCSController{
 	 * @param TrustedServers $trustedServers
 	 * @param DbHandler $dbHandler
 	 * @param ILogger $logger
+	 * @param ITimeFactory $timeFactory
 	 */
 	public function __construct(
 		$appName,
@@ -79,7 +86,8 @@ class OCSAuthAPIController extends OCSController{
 		IJobList $jobList,
 		TrustedServers $trustedServers,
 		DbHandler $dbHandler,
-		ILogger $logger
+		ILogger $logger,
+		ITimeFactory $timeFactory
 	) {
 		parent::__construct($appName, $request);
 
@@ -88,6 +96,7 @@ class OCSAuthAPIController extends OCSController{
 		$this->trustedServers = $trustedServers;
 		$this->dbHandler = $dbHandler;
 		$this->logger = $logger;
+		$this->timeFactory = $timeFactory;
 	}
 
 	/**
@@ -149,20 +158,12 @@ class OCSAuthAPIController extends OCSController{
 			throw new OCSForbiddenException();
 		}
 
-		// we ask for the shared secret so we no longer have to ask the other server
-		// to request the shared secret
-		$this->jobList->remove('OCA\Federation\BackgroundJob\RequestSharedSecret',
-			[
-				'url' => $url,
-				'token' => $localToken
-			]
-		);
-
 		$this->jobList->add(
 			'OCA\Federation\BackgroundJob\GetSharedSecret',
 			[
 				'url' => $url,
 				'token' => $token,
+				'created' => $this->timeFactory->getTime()
 			]
 		);
 
@@ -198,8 +199,6 @@ class OCSAuthAPIController extends OCSController{
 		$sharedSecret = $this->secureRandom->generate(32);
 
 		$this->trustedServers->addSharedSecret($url, $sharedSecret);
-		// reset token after the exchange of the shared secret was successful
-		$this->dbHandler->addToken($url, '');
 
 		return new Http\DataResponse([
 			'sharedSecret' => $sharedSecret
@@ -210,5 +209,4 @@ class OCSAuthAPIController extends OCSController{
 		$storedToken = $this->dbHandler->getToken($url);
 		return hash_equals($storedToken, $token);
 	}
-
 }

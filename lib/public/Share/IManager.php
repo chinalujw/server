@@ -2,6 +2,14 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
+ * @author Daniel Calviño Sánchez <danxuliu@gmail.com>
+ * @author Joas Schilling <coding@schilljs.com>
+ * @author John Molakvoæ (skjnldsv) <skjnldsv@protonmail.com>
+ * @author Julius Härtl <jus@bitgrid.net>
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Robin Appelman <robin@icewind.nl>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license AGPL-3.0
@@ -16,7 +24,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -25,12 +33,12 @@ namespace OCP\Share;
 use OCP\Files\Folder;
 use OCP\Files\Node;
 
+use OCP\Share\Exceptions\GenericShareException;
 use OCP\Share\Exceptions\ShareNotFound;
 
 /**
  * Interface IManager
  *
- * @package OCP\Share
  * @since 9.0.0
  */
 interface IManager {
@@ -40,6 +48,7 @@ interface IManager {
 	 *
 	 * @param IShare $share
 	 * @return IShare The share object
+	 * @throws \Exception
 	 * @since 9.0.0
 	 */
 	public function createShare(IShare $share);
@@ -48,18 +57,32 @@ interface IManager {
 	 * Update a share.
 	 * The target of the share can't be changed this way: use moveShare
 	 * The share can't be removed this way (permission 0): use deleteShare
+	 * The state can't be changed this way: use acceptShare
 	 *
 	 * @param IShare $share
 	 * @return IShare The share object
+	 * @throws \InvalidArgumentException
 	 * @since 9.0.0
 	 */
 	public function updateShare(IShare $share);
+
+	/**
+	 * Accept a share.
+	 *
+	 * @param IShare $share
+	 * @param string $recipientId
+	 * @return IShare The share object
+	 * @throws \InvalidArgumentException
+	 * @since 18.0.0
+	 */
+	public function acceptShare(IShare $share, string $recipientId): IShare;
 
 	/**
 	 * Delete a share
 	 *
 	 * @param IShare $share
 	 * @throws ShareNotFound
+	 * @throws \InvalidArgumentException
 	 * @since 9.0.0
 	 */
 	public function deleteShare(IShare $share);
@@ -75,6 +98,20 @@ interface IManager {
 	 * @since 9.0.0
 	 */
 	public function deleteFromSelf(IShare $share, $recipientId);
+
+	/**
+	 * Restore the share when it has been deleted
+	 * Certain share types can be restored when they have been deleted
+	 * but the provider should properly handle this\
+	 *
+	 * @param IShare $share The share to restore
+	 * @param string $recipientId The user to restore the share for
+	 * @return IShare The restored share object
+	 * @throws GenericShareException In case restoring the share failed
+	 *
+	 * @since 14.0.0
+	 */
+	public function restoreShare(IShare $share, string $recipientId): IShare;
 
 	/**
 	 * Move the share as a recipient of the share.
@@ -126,6 +163,20 @@ interface IManager {
 	 * @since 9.0.0
 	 */
 	public function getSharedWith($userId, $shareType, $node = null, $limit = 50, $offset = 0);
+
+	/**
+	 * Get deleted shares shared with $user.
+	 * Filter by $node if provided
+	 *
+	 * @param string $userId
+	 * @param int $shareType
+	 * @param Node|null $node
+	 * @param int $limit The maximum number of shares returned, -1 for all
+	 * @param int $offset
+	 * @return IShare[]
+	 * @since 14.0.0
+	 */
+	public function getDeletedSharedWith($userId, $shareType, $node = null, $limit = 50, $offset = 0);
 
 	/**
 	 * Retrieve a share by the share id.
@@ -318,6 +369,22 @@ interface IManager {
 	public function allowGroupSharing();
 
 	/**
+	 * Check if user enumeration is allowed
+	 *
+	 * @return bool
+	 * @since 19.0.0
+	 */
+	public function allowEnumeration(): bool;
+
+	/**
+	 * Check if user enumeration is limited to the users groups
+	 *
+	 * @return bool
+	 * @since 19.0.0
+	 */
+	public function limitEnumerationToGroups(): bool;
+
+	/**
 	 * Check if sharing is disabled for the given user
 	 *
 	 * @param string $userId
@@ -334,6 +401,14 @@ interface IManager {
 	public function outgoingServer2ServerSharesAllowed();
 
 	/**
+	 * Check if outgoing server2server shares are allowed
+	 * @return bool
+	 * @since 14.0.0
+	 */
+	public function outgoingServer2ServerGroupSharesAllowed();
+
+
+	/**
 	 * Check if a given share provider exists
 	 * @param int $shareType
 	 * @return bool
@@ -341,4 +416,21 @@ interface IManager {
 	 */
 	public function shareProviderExists($shareType);
 
+	/**
+	 * @param string $shareProviderClass
+	 * @since 21.0.0
+	 */
+	public function registerShareProvider(string $shareProviderClass): void;
+
+	/**
+	 * @Internal
+	 *
+	 * Get all the shares as iterable to reduce memory overhead
+	 * Note, since this opens up database cursors the iterable should
+	 * be fully itterated.
+	 *
+	 * @return iterable
+	 * @since 18.0.0
+	 */
+	public function getAllShares(): iterable;
 }

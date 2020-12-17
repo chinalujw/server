@@ -6,6 +6,7 @@
  * @author Joas Schilling <coding@schilljs.com>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author scolebrook <scolebrook@mac.com>
  *
  * @license AGPL-3.0
@@ -20,7 +21,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -32,6 +33,7 @@
 
 // use OCP namespace for all classes that are considered public.
 // This means that they should be used by apps instead of the internal ownCloud classes
+
 namespace OCP;
 
 /**
@@ -135,17 +137,18 @@ class Defaults {
 	 * @return string
 	 * @since 6.0.0
 	 */
-	public function getSlogan() {
-		return $this->defaults->getSlogan();
+	public function getSlogan(?string $lang = null) {
+		return $this->defaults->getSlogan($lang);
 	}
 
 	/**
 	 * logo claim
 	 * @return string
 	 * @since 6.0.0
+	 * @deprecated 13.0.0
 	 */
 	public function getLogoClaim() {
-		return $this->defaults->getLogoClaim();
+		return '';
 	}
 
 	/**
@@ -211,5 +214,14 @@ class Defaults {
 	 */
 	public function getTitle() {
 		return $this->defaults->getTitle();
+	}
+
+	/**
+	 * Returns primary color
+	 * @return string
+	 * @since 13.0.0
+	 */
+	public function getTextColorPrimary() {
+		return $this->defaults->getTextColorPrimary();
 	}
 }

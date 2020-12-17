@@ -1,6 +1,13 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2017 Bjoern Schiessle <bjoern@schiessle.org>
+ *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -15,10 +22,9 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-
 
 namespace OCP\OCS;
 
@@ -27,7 +33,6 @@ namespace OCP\OCS;
  *
  * Allows you to discover OCS end-points on a remote server
  *
- * @package OCP\OCS
  * @since 12.0.0
  */
 interface IDiscoveryService {
@@ -41,8 +46,8 @@ interface IDiscoveryService {
 	 *
 	 * @param string $remote
 	 * @param string $service the service you want to discover
+	 * @param bool $skipCache We won't check if the data is in the cache. This is useful if a background job is updating the status - Added in 14.0.0
 	 * @return array
 	 */
-	public function discover($remote, $service);
-
+	public function discover(string $remote, string $service, bool $skipCache = false): array;
 }

@@ -2,6 +2,9 @@
 /**
  * @copyright Copyright (c) 2017 Lukas Reschke <lukas@statuscode.ch>
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ *
  * @license GNU AGPL version 3 or any later version
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,7 +18,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -84,7 +87,7 @@ class RateLimitingMiddleware extends Middleware {
 		$userLimit = $this->reflector->getAnnotationParameter('UserRateThrottle', 'limit');
 		$userPeriod = $this->reflector->getAnnotationParameter('UserRateThrottle', 'period');
 		$rateLimitIdentifier = get_class($controller) . '::' . $methodName;
-		if($userLimit !== '' && $userPeriod !== '' && $this->userSession->isLoggedIn()) {
+		if ($userLimit !== '' && $userPeriod !== '' && $this->userSession->isLoggedIn()) {
 			$this->limiter->registerUserRequest(
 				$rateLimitIdentifier,
 				$userLimit,
@@ -105,7 +108,7 @@ class RateLimitingMiddleware extends Middleware {
 	 * {@inheritDoc}
 	 */
 	public function afterException($controller, $methodName, \Exception $exception) {
-		if($exception instanceof RateLimitExceededException) {
+		if ($exception instanceof RateLimitExceededException) {
 			if (stripos($this->request->getHeader('Accept'),'html') === false) {
 				$response = new JSONResponse(
 					[
@@ -114,7 +117,7 @@ class RateLimitingMiddleware extends Middleware {
 					$exception->getCode()
 				);
 			} else {
-					$response = new TemplateResponse(
+				$response = new TemplateResponse(
 						'core',
 						'403',
 							[
@@ -122,7 +125,7 @@ class RateLimitingMiddleware extends Middleware {
 							],
 						'guest'
 					);
-					$response->setStatus($exception->getCode());
+				$response->setStatus($exception->getCode());
 			}
 
 			return $response;

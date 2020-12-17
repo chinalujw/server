@@ -2,6 +2,9 @@
 /**
  * @copyright Copyright (c) 2017 Lukas Reschke <lukas@statuscode.ch>
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ *
  * @license GNU AGPL version 3 or any later version
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,7 +18,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,7 +42,7 @@ abstract class Bundle {
 	 *
 	 * @return string
 	 */
-	public final function getIdentifier() {
+	final public function getIdentifier() {
 		return substr(strrchr(get_class($this), '\\'), 1);
 	}
 
@@ -48,12 +51,12 @@ abstract class Bundle {
 	 *
 	 * @return string
 	 */
-	public abstract function getName();
+	abstract public function getName();
 
 	/**
 	 * Get the list of app identifiers in the bundle
 	 *
 	 * @return array
 	 */
-	public abstract function getAppIdentifiers();
+	abstract public function getAppIdentifiers();
 }

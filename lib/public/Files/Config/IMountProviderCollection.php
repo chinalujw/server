@@ -17,7 +17,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -57,6 +57,14 @@ interface IMountProviderCollection {
 	public function registerProvider(IMountProvider $provider);
 
 	/**
+	 * Add a filter for mounts
+	 *
+	 * @param callable $filter (IMountPoint $mountPoint, IUser $user) => boolean
+	 * @since 14.0.0
+	 */
+	public function registerMountFilter(callable $filter);
+
+	/**
 	 * Add a provider for home mount points
 	 *
 	 * @param \OCP\Files\Config\IHomeMountProvider $provider
@@ -71,4 +79,12 @@ interface IMountProviderCollection {
 	 * @since 9.0.0
 	 */
 	public function getMountCache();
+
+	/**
+	 * Get all root mountpoints
+	 *
+	 * @return \OCP\Files\Mount\IMountPoint[]
+	 * @since 20.0.0
+	 */
+	public function getRootMounts(): array;
 }

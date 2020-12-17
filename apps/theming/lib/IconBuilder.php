@@ -2,22 +2,25 @@
 /**
  * @copyright Copyright (c) 2016 Julius Härtl <jus@bitgrid.net>
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Jan-Christoph Borchardt <hey@jancborchardt.net>
+ * @author Julius Haertl <jus@bitgrid.net>
  * @author Julius Härtl <jus@bitgrid.net>
  *
  * @license GNU AGPL version 3 or any later version
  *
- *  This program is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU Affero General Public License as
- *  published by the Free Software Foundation, either version 3 of the
- *  License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU Affero General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
  *
- *  You should have received a copy of the GNU Affero General Public License
- *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,19 +36,24 @@ class IconBuilder {
 	private $themingDefaults;
 	/** @var Util */
 	private $util;
+	/** @var ImageManager */
+	private $imageManager;
 
 	/**
 	 * IconBuilder constructor.
 	 *
 	 * @param ThemingDefaults $themingDefaults
 	 * @param Util $util
+	 * @param ImageManager $imageManager
 	 */
 	public function __construct(
 		ThemingDefaults $themingDefaults,
-		Util $util
+		Util $util,
+		ImageManager $imageManager
 	) {
 		$this->themingDefaults = $themingDefaults;
 		$this->util = $util;
+		$this->imageManager = $imageManager;
 	}
 
 	/**
@@ -53,14 +61,38 @@ class IconBuilder {
 	 * @return string|false image blob
 	 */
 	public function getFavicon($app) {
+		if (!$this->imageManager->shouldReplaceIcons()) {
+			return false;
+		}
 		try {
-			$icon = $this->renderAppIcon($app, 32);
+			$favicon = new Imagick();
+			$favicon->setFormat("ico");
+			$icon = $this->renderAppIcon($app, 128);
 			if ($icon === false) {
 				return false;
 			}
-			$icon->setImageFormat("png24");
-			$data = $icon->getImageBlob();
+			$icon->setImageFormat("png32");
+
+			$clone = clone $icon;
+			$clone->scaleImage(16,0);
+			$favicon->addImage($clone);
+
+			$clone = clone $icon;
+			$clone->scaleImage(32,0);
+			$favicon->addImage($clone);
+
+			$clone = clone $icon;
+			$clone->scaleImage(64,0);
+			$favicon->addImage($clone);
+
+			$clone = clone $icon;
+			$clone->scaleImage(128,0);
+			$favicon->addImage($clone);
+
+			$data = $favicon->getImagesBlob();
+			$favicon->destroy();
 			$icon->destroy();
+			$clone->destroy();
 			return $data;
 		} catch (\ImagickException $e) {
 			return false;
@@ -77,7 +109,7 @@ class IconBuilder {
 			if ($icon === false) {
 				return false;
 			}
-			$icon->setImageFormat("png24");
+			$icon->setImageFormat("png32");
 			$data = $icon->getImageBlob();
 			$icon->destroy();
 			return $data;
@@ -96,7 +128,7 @@ class IconBuilder {
 	 */
 	public function renderAppIcon($app, $size) {
 		$appIcon = $this->util->getAppIcon($app);
-		if($appIcon === false) {
+		if ($appIcon === false) {
 			return false;
 		}
 		if ($appIcon instanceof ISimpleFile) {
@@ -107,7 +139,7 @@ class IconBuilder {
 			$mime = mime_content_type($appIcon);
 		}
 
-		if($appIconContent === false || $appIconContent === "") {
+		if ($appIconContent === false || $appIconContent === "") {
 			return false;
 		}
 
@@ -119,8 +151,8 @@ class IconBuilder {
 			'<rect x="0" y="0" rx="100" ry="100" width="512" height="512" style="fill:' . $color . ';" />' .
 			'</svg>';
 		// resize svg magic as this seems broken in Imagemagick
-		if($mime === "image/svg+xml" || substr($appIconContent, 0, 4) === "<svg") {
-			if(substr($appIconContent, 0, 5) !== "<?xml") {
+		if ($mime === "image/svg+xml" || substr($appIconContent, 0, 4) === "<svg") {
+			if (substr($appIconContent, 0, 5) !== "<?xml") {
 				$svg = "<?xml version=\"1.0\"?>".$appIconContent;
 			} else {
 				$svg = $appIconContent;
@@ -132,7 +164,7 @@ class IconBuilder {
 			$res = $tmp->getImageResolution();
 			$tmp->destroy();
 
-			if($x>$y) {
+			if ($x > $y) {
 				$max = $x;
 			} else {
 				$max = $y;
@@ -145,6 +177,17 @@ class IconBuilder {
 			$appIconFile->setResolution($resX, $resY);
 			$appIconFile->setBackgroundColor(new ImagickPixel('transparent'));
 			$appIconFile->readImageBlob($svg);
+
+			/**
+			 * invert app icons for bright primary colors
+			 * the default nextcloud logo will not be inverted to black
+			 */
+			if ($this->util->invertTextColor($color)
+				&& !$appIcon instanceof ISimpleFile
+				&& $app !== "core"
+			) {
+				$appIconFile->negateImage(false);
+			}
 			$appIconFile->scaleImage(512, 512, true);
 		} else {
 			$appIconFile = new Imagick();
@@ -161,8 +204,6 @@ class IconBuilder {
 		// center icon
 		$offset_w = 512 / 2 - $innerWidth / 2;
 		$offset_h = 512 / 2 - $innerHeight / 2;
-
-		$appIconFile->setImageFormat("png24");
 
 		$finalIconFile = new Imagick();
 		$finalIconFile->setBackgroundColor(new ImagickPixel('transparent'));
@@ -197,5 +238,4 @@ class IconBuilder {
 			return false;
 		}
 	}
-
 }

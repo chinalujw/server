@@ -3,10 +3,13 @@
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
  * @author Bart Visscher <bartv@thisnet.nl>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Ole Ostergaard <ole.c.ostergaard@gmail.com>
  * @author Robin Appelman <robin@icewind.nl>
  * @author Robin McCorkell <robin@mccorkell.me.uk>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @license AGPL-3.0
@@ -21,7 +24,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -33,16 +36,25 @@
 
 // use OCP namespace for all classes that are considered public.
 // This means that they should be used by apps instead of the internal ownCloud classes
+
 namespace OCP;
+
+use Doctrine\DBAL\Schema\Schema;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 
 /**
  * Interface IDBConnection
  *
- * @package OCP
  * @since 6.0.0
  */
 interface IDBConnection {
+	public const ADD_MISSING_INDEXES_EVENT = self::class . '::ADD_MISSING_INDEXES';
+	public const CHECK_MISSING_INDEXES_EVENT = self::class . '::CHECK_MISSING_INDEXES';
+	public const ADD_MISSING_PRIMARY_KEYS_EVENT = self::class . '::ADD_MISSING_PRIMARY_KEYS';
+	public const CHECK_MISSING_PRIMARY_KEYS_EVENT = self::class . '::CHECK_MISSING_PRIMARY_KEYS';
+	public const ADD_MISSING_COLUMNS_EVENT = self::class . '::ADD_MISSING_COLUMNS';
+	public const CHECK_MISSING_COLUMNS_EVENT = self::class . '::CHECK_MISSING_COLUMNS';
+
 	/**
 	 * Gets the QueryBuilder for the connection.
 	 *
@@ -59,7 +71,7 @@ interface IDBConnection {
 	 * @return \Doctrine\DBAL\Driver\Statement The prepared statement.
 	 * @since 6.0.0
 	 */
-	public function prepare($sql, $limit=null, $offset=null);
+	public function prepare($sql, $limit = null, $offset = null);
 
 	/**
 	 * Executes an, optionally parameterized, SQL query.
@@ -67,13 +79,13 @@ interface IDBConnection {
 	 * If the query is parameterized, a prepared statement is used.
 	 * If an SQLLogger is configured, the execution is logged.
 	 *
-	 * @param string $query The SQL query to execute.
+	 * @param string $sql The SQL query to execute.
 	 * @param string[] $params The parameters to bind to the query, if any.
 	 * @param array $types The types the previous parameters are in.
 	 * @return \Doctrine\DBAL\Driver\Statement The executed statement.
 	 * @since 8.0.0
 	 */
-	public function executeQuery($query, array $params = array(), $types = array());
+	public function executeQuery($sql, array $params = [], $types = []);
 
 	/**
 	 * Executes an SQL INSERT/UPDATE/DELETE query with the given parameters
@@ -81,13 +93,29 @@ interface IDBConnection {
 	 *
 	 * This method supports PDO binding types as well as DBAL mapping types.
 	 *
-	 * @param string $query The SQL query.
+	 * @param string $sql The SQL query.
 	 * @param array $params The query parameters.
 	 * @param array $types The parameter types.
 	 * @return integer The number of affected rows.
 	 * @since 8.0.0
+	 *
+	 * @deprecated 21.0.0 use executeStatement
 	 */
-	public function executeUpdate($query, array $params = array(), array $types = array());
+	public function executeUpdate($sql, array $params = [], array $types = []);
+
+	/**
+	 * Executes an SQL INSERT/UPDATE/DELETE query with the given parameters
+	 * and returns the number of affected rows.
+	 *
+	 * This method supports PDO binding types as well as DBAL mapping types.
+	 *
+	 * @param string $sql The SQL query.
+	 * @param array $params The query parameters.
+	 * @param array $types The parameter types.
+	 * @return integer The number of affected rows.
+	 * @since 21.0.0
+	 */
+	public function executeStatement($sql, array $params = [], array $types = []);
 
 	/**
 	 * Used to get the id of the just inserted element
@@ -98,7 +126,9 @@ interface IDBConnection {
 	public function lastInsertId($table = null);
 
 	/**
-	 * Insert a row if the matching row does not exists.
+	 * Insert a row if the matching row does not exists. To accomplish proper race condition avoidance
+	 * it is needed that there is also a unique constraint on the values. Then this method will
+	 * catch the exception and return 0.
 	 *
 	 * @param string $table The table name (will replace *PREFIX* with the actual prefix)
 	 * @param array $input data that should be inserted into the table  (column name => value)
@@ -108,8 +138,23 @@ interface IDBConnection {
 	 * @return int number of inserted rows
 	 * @throws \Doctrine\DBAL\DBALException
 	 * @since 6.0.0 - parameter $compare was added in 8.1.0, return type changed from boolean in 8.1.0
+	 * @deprecated 15.0.0 - use unique index and "try { $db->insert() } catch (UniqueConstraintViolationException $e) {}" instead, because it is more reliable and does not have the risk for deadlocks - see https://github.com/nextcloud/server/pull/12371
 	 */
 	public function insertIfNotExist($table, $input, array $compare = null);
+
+
+	/**
+	 *
+	 * Insert a row if the row does not exist. Eventual conflicts during insert will be ignored.
+	 *
+	 * Implementation is not fully finished and should not be used!
+	 *
+	 * @param string $table The table name (will replace *PREFIX* with the actual prefix)
+	 * @param array $values data that should be inserted into the table  (column name => value)
+	 * @return int number of inserted rows
+	 * @since 16.0.0
+	 */
+	public function insertIgnoreConflict(string $table,array $values) : int;
 
 	/**
 	 * Insert or update a row value
@@ -259,4 +304,20 @@ interface IDBConnection {
 	 * @since 11.0.0
 	 */
 	public function supports4ByteText();
+
+	/**
+	 * Create the schema of the connected database
+	 *
+	 * @return Schema
+	 * @since 13.0.0
+	 */
+	public function createSchema();
+
+	/**
+	 * Migrate the database to the given schema
+	 *
+	 * @param Schema $toSchema
+	 * @since 13.0.0
+	 */
+	public function migrateToSchema(Schema $toSchema);
 }

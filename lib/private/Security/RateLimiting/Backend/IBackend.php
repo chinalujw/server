@@ -1,6 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2017 Lukas Reschke <lukas@statuscode.ch>
+ *
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -15,7 +21,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,9 +43,9 @@ interface IBackend {
 	 * @param int $seconds Seconds to look back at
 	 * @return int
 	 */
-	public function getAttempts($methodIdentifier,
-								$userIdentifier,
-								$seconds);
+	public function getAttempts(string $methodIdentifier,
+								string $userIdentifier,
+								int $seconds): int;
 
 	/**
 	 * Registers an attempt
@@ -48,7 +54,7 @@ interface IBackend {
 	 * @param string $userIdentifier Identifier for the user
 	 * @param int $period Period in seconds how long this attempt should be stored
 	 */
-	public function registerAttempt($methodIdentifier,
-									$userIdentifier,
-									$period);
+	public function registerAttempt(string $methodIdentifier,
+									string $userIdentifier,
+									int $period);
 }

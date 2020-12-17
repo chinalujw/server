@@ -1,4 +1,5 @@
 <?php
+
 define('PHPUNIT_RUN', 1);
 
 $configDir = getenv('CONFIG_DIR');
@@ -13,10 +14,6 @@ require_once __DIR__ . '/../lib/base.php';
 
 // load all enabled apps
 \OC_App::loadApps();
-
-if (!class_exists('PHPUnit_Framework_TestCase')) {
-	require_once('PHPUnit/Autoload.php');
-}
 
 OC_Hook::clear();
 

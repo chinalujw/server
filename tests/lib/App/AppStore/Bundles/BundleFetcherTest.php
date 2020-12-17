@@ -23,19 +23,21 @@ namespace Test\App\AppStore\Bundles;
 
 use OC\App\AppStore\Bundles\BundleFetcher;
 use OC\App\AppStore\Bundles\CoreBundle;
+use OC\App\AppStore\Bundles\EducationBundle;
 use OC\App\AppStore\Bundles\EnterpriseBundle;
 use OC\App\AppStore\Bundles\GroupwareBundle;
+use OC\App\AppStore\Bundles\HubBundle;
 use OC\App\AppStore\Bundles\SocialSharingBundle;
 use OCP\IL10N;
 use Test\TestCase;
 
 class BundleFetcherTest extends TestCase {
-	/** @var IL10N|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IL10N|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 	/** @var BundleFetcher */
 	private $bundleFetcher;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->l10n = $this->createMock(IL10N::class);
@@ -48,8 +50,10 @@ class BundleFetcherTest extends TestCase {
 	public function testGetBundles() {
 		$expected = [
 			new EnterpriseBundle($this->l10n),
+			new HubBundle($this->l10n),
 			new GroupwareBundle($this->l10n),
 			new SocialSharingBundle($this->l10n),
+			new EducationBundle($this->l10n),
 		];
 		$this->assertEquals($expected, $this->bundleFetcher->getBundles());
 	}
@@ -67,12 +71,11 @@ class BundleFetcherTest extends TestCase {
 		$this->assertEquals(new GroupwareBundle($this->l10n), $this->bundleFetcher->getBundleByIdentifier('GroupwareBundle'));
 	}
 
-	/**
-	 * @expectedException \BadMethodCallException
-	 * @expectedExceptionMessage Bundle with specified identifier does not exist
-	 */
+
 	public function testGetBundleByIdentifierWithException() {
+		$this->expectException(\BadMethodCallException::class);
+		$this->expectExceptionMessage('Bundle with specified identifier does not exist');
+
 		$this->bundleFetcher->getBundleByIdentifier('NotExistingBundle');
 	}
-
 }

@@ -27,29 +27,36 @@ use OC\Mail\EMailTemplate;
 use OCP\Defaults;
 use OCP\IL10N;
 use OCP\IURLGenerator;
+use OCP\L10N\IFactory;
 use Test\TestCase;
 
 class EMailTemplateTest extends TestCase {
-	/** @var Defaults|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var Defaults|\PHPUnit\Framework\MockObject\MockObject */
 	private $defaults;
-	/** @var IURLGenerator|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
 	private $urlGenerator;
-	/** @var IL10N|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IFactory|\PHPUnit\Framework\MockObject\MockObject */
 	private $l10n;
 	/** @var EMailTemplate */
 	private $emailTemplate;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->defaults = $this->createMock(Defaults::class);
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
-		$this->l10n = $this->createMock(IL10N::class);
+		$this->l10n = $this->createMock(IFactory::class);
+
+		$this->l10n->method('get')
+			->with('lib', '')
+			->willReturn($this->createMock(IL10N::class));
 
 		$this->emailTemplate = new EMailTemplate(
 			$this->defaults,
 			$this->urlGenerator,
-			$this->l10n
+			$this->l10n,
+			'test.TestTemplate',
+			[]
 		);
 	}
 
@@ -66,6 +73,10 @@ class EMailTemplateTest extends TestCase {
 			->expects($this->any())
 			->method('getName')
 			->willReturn('TestCloud');
+		$this->defaults
+			->expects($this->any())
+			->method('getTextColorPrimary')
+			->willReturn('#ffffff');
 		$this->urlGenerator
 			->expects($this->once())
 			->method('getAbsoluteURL')
@@ -74,7 +85,7 @@ class EMailTemplateTest extends TestCase {
 
 		$this->emailTemplate->addHeader();
 		$this->emailTemplate->addHeading('Welcome aboard');
-		$this->emailTemplate->addBodyText('You have now an Nextcloud account, you can add, protect, and share your data.');
+		$this->emailTemplate->addBodyText('Welcome to your Nextcloud account, you can add, protect, and share your data.');
 		$this->emailTemplate->addBodyText('Your username is: abc');
 		$this->emailTemplate->addBodyButtonGroup(
 			'Set your password', 'https://example.org/resetPassword/123',
@@ -107,6 +118,10 @@ class EMailTemplateTest extends TestCase {
 			->expects($this->any())
 			->method('getLogo')
 			->willReturn('/img/logo-mail-header.png');
+		$this->defaults
+			->expects($this->any())
+			->method('getTextColorPrimary')
+			->willReturn('#ffffff');
 		$this->urlGenerator
 			->expects($this->once())
 			->method('getAbsoluteURL')
@@ -115,7 +130,7 @@ class EMailTemplateTest extends TestCase {
 
 		$this->emailTemplate->addHeader();
 		$this->emailTemplate->addHeading('Welcome aboard');
-		$this->emailTemplate->addBodyText('You have now an Nextcloud account, you can add, protect, and share your data.');
+		$this->emailTemplate->addBodyText('Welcome to your Nextcloud account, you can add, protect, and share your data.');
 		$this->emailTemplate->addBodyText('Your username is: abc');
 		$this->emailTemplate->addBodyButtonGroup(
 			'Set your password', 'https://example.org/resetPassword/123',
@@ -146,6 +161,10 @@ class EMailTemplateTest extends TestCase {
 			->expects($this->any())
 			->method('getLogo')
 			->willReturn('/img/logo-mail-header.png');
+		$this->defaults
+			->expects($this->any())
+			->method('getTextColorPrimary')
+			->willReturn('#ffffff');
 		$this->urlGenerator
 			->expects($this->once())
 			->method('getAbsoluteURL')
@@ -154,7 +173,7 @@ class EMailTemplateTest extends TestCase {
 
 		$this->emailTemplate->addHeader();
 		$this->emailTemplate->addHeading('Welcome aboard');
-		$this->emailTemplate->addBodyText('You have now an Nextcloud account, you can add, protect, and share your data.');
+		$this->emailTemplate->addBodyText('Welcome to your Nextcloud account, you can add, protect, and share your data.');
 		$this->emailTemplate->addBodyText('Your username is: abc');
 		$this->emailTemplate->addBodyButton(
 			'Set your password', 'https://example.org/resetPassword/123',
@@ -187,6 +206,10 @@ class EMailTemplateTest extends TestCase {
 			->expects($this->any())
 			->method('getLogo')
 			->willReturn('/img/logo-mail-header.png');
+		$this->defaults
+			->expects($this->any())
+			->method('getTextColorPrimary')
+			->willReturn('#ffffff');
 		$this->urlGenerator
 			->expects($this->once())
 			->method('getAbsoluteURL')
@@ -195,7 +218,7 @@ class EMailTemplateTest extends TestCase {
 
 		$this->emailTemplate->addHeader();
 		$this->emailTemplate->addHeading('Welcome aboard', 'Welcome aboard - text');
-		$this->emailTemplate->addBodyText('You have now an Nextcloud account, you can add, protect, and share your data.', 'You have now an Nextcloud account, you can add, protect, and share your data. - text');
+		$this->emailTemplate->addBodyText('Welcome to your Nextcloud account, you can add, protect, and share your data.', 'Welcome to your Nextcloud account, you can add, protect, and share your data. - text');
 		$this->emailTemplate->addBodyText('Your username is: abc');
 		$this->emailTemplate->addBodyButtonGroup(
 			'Set your password', 'https://example.org/resetPassword/123',
@@ -209,6 +232,4 @@ class EMailTemplateTest extends TestCase {
 		$expectedTXT = file_get_contents(\OC::$SERVERROOT . '/tests/data/emails/new-account-email-custom-text-alternative.txt');
 		$this->assertSame($expectedTXT, $this->emailTemplate->renderText());
 	}
-
-
 }

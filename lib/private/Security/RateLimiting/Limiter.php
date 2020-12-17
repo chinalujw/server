@@ -1,6 +1,12 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * @copyright Copyright (c) 2017 Lukas Reschke <lukas@statuscode.ch>
+ *
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -15,7 +21,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,9 +31,7 @@ use OC\Security\Normalizer\IpAddress;
 use OC\Security\RateLimiting\Backend\IBackend;
 use OC\Security\RateLimiting\Exception\RateLimitExceededException;
 use OCP\AppFramework\Utility\ITimeFactory;
-use OCP\IRequest;
 use OCP\IUser;
-use OCP\IUserSession;
 
 class Limiter {
 	/** @var IBackend */
@@ -36,14 +40,10 @@ class Limiter {
 	private $timeFactory;
 
 	/**
-	 * @param IUserSession $userSession
-	 * @param IRequest $request
 	 * @param ITimeFactory $timeFactory
 	 * @param IBackend $backend
 	 */
-	public function __construct(IUserSession $userSession,
-								IRequest $request,
-								ITimeFactory $timeFactory,
+	public function __construct(ITimeFactory $timeFactory,
 								IBackend $backend) {
 		$this->backend = $backend;
 		$this->timeFactory = $timeFactory;
@@ -56,12 +56,12 @@ class Limiter {
 	 * @param int $limit
 	 * @throws RateLimitExceededException
 	 */
-	private function register($methodIdentifier,
-							  $userIdentifier,
-							  $period,
-							  $limit) {
-		$existingAttempts = $this->backend->getAttempts($methodIdentifier, $userIdentifier, (int)$period);
-		if ($existingAttempts >= (int)$limit) {
+	private function register(string $methodIdentifier,
+							  string $userIdentifier,
+							  int $period,
+							  int $limit): void {
+		$existingAttempts = $this->backend->getAttempts($methodIdentifier, $userIdentifier, $period);
+		if ($existingAttempts >= $limit) {
 			throw new RateLimitExceededException();
 		}
 
@@ -77,10 +77,10 @@ class Limiter {
 	 * @param string $ip
 	 * @throws RateLimitExceededException
 	 */
-	public function registerAnonRequest($identifier,
-										$anonLimit,
-										$anonPeriod,
-										$ip) {
+	public function registerAnonRequest(string $identifier,
+										int $anonLimit,
+										int $anonPeriod,
+										string $ip): void {
 		$ipSubnet = (new IpAddress($ip))->getSubnet();
 
 		$anonHashIdentifier = hash('sha512', 'anon::' . $identifier . $ipSubnet);
@@ -96,10 +96,10 @@ class Limiter {
 	 * @param IUser $user
 	 * @throws RateLimitExceededException
 	 */
-	public function registerUserRequest($identifier,
-										$userLimit,
-										$userPeriod,
-										IUser $user) {
+	public function registerUserRequest(string $identifier,
+										int $userLimit,
+										int $userPeriod,
+										IUser $user): void {
 		$userHashIdentifier = hash('sha512', 'user::' . $identifier . $user->getUID());
 		$this->register($identifier, $userHashIdentifier, $userPeriod, $userLimit);
 	}

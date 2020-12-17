@@ -20,10 +20,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
 namespace OC\Core\Controller;
 
 use OC\CapabilitiesManager;
-use OC\Security\Bruteforce\Throttler;
 use OC\Security\IdentityProof\Key;
 use OC\Security\IdentityProof\Manager;
 use OCP\AppFramework\Http\DataResponse;
@@ -34,20 +34,20 @@ use OCP\IUserSession;
 use Test\TestCase;
 
 class OCSControllerTest extends TestCase {
-	/** @var IRequest|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	private $request;
-	/** @var CapabilitiesManager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var CapabilitiesManager|\PHPUnit\Framework\MockObject\MockObject */
 	private $capabilitiesManager;
-	/** @var IUserSession|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IUserSession|\PHPUnit\Framework\MockObject\MockObject */
 	private $userSession;
-	/** @var IUserManager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IUserManager|\PHPUnit\Framework\MockObject\MockObject */
 	private $userManager;
-	/** @var Manager|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var Manager|\PHPUnit\Framework\MockObject\MockObject */
 	private $keyManager;
 	/** @var OCSController */
 	private $controller;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->request = $this->createMock(IRequest::class);
@@ -85,16 +85,20 @@ class OCSControllerTest extends TestCase {
 	}
 
 	public function testGetCapabilities() {
+		$this->userSession->expects($this->once())
+			->method('isLoggedIn')
+			->willReturn(true);
 		list($major, $minor, $micro) = \OCP\Util::getVersion();
 
 		$result = [];
-		$result['version'] = array(
+		$result['version'] = [
 			'major' => $major,
 			'minor' => $minor,
 			'micro' => $micro,
 			'string' => \OC_Util::getVersionString(),
 			'edition' => '',
-		);
+			'extendedSupport' => false
+		];
 
 		$capabilities = [
 			'foo' => 'bar',
@@ -109,6 +113,41 @@ class OCSControllerTest extends TestCase {
 		$result['capabilities'] = $capabilities;
 
 		$expected = new DataResponse($result);
+		$expected->setETag(md5(json_encode($result)));
+		$this->assertEquals($expected, $this->controller->getCapabilities());
+	}
+
+	public function testGetCapabilitiesPublic() {
+		$this->userSession->expects($this->once())
+			->method('isLoggedIn')
+			->willReturn(false);
+		list($major, $minor, $micro) = \OCP\Util::getVersion();
+
+		$result = [];
+		$result['version'] = [
+			'major' => $major,
+			'minor' => $minor,
+			'micro' => $micro,
+			'string' => \OC_Util::getVersionString(),
+			'edition' => '',
+			'extendedSupport' => false
+		];
+
+		$capabilities = [
+			'foo' => 'bar',
+			'a' => [
+				'b' => true,
+				'c' => 11,
+			]
+		];
+		$this->capabilitiesManager->method('getCapabilities')
+			->with(true)
+			->willReturn($capabilities);
+
+		$result['capabilities'] = $capabilities;
+
+		$expected = new DataResponse($result);
+		$expected->setETag(md5(json_encode($result)));
 		$this->assertEquals($expected, $this->controller->getCapabilities());
 	}
 
@@ -134,7 +173,7 @@ class OCSControllerTest extends TestCase {
 				$this->equalTo('wrongpass')
 			)->willReturn(false);
 
-		$expected = new DataResponse(null, 102);
+		$expected = new DataResponse([], 102);
 		$expected->throttle();
 		$this->assertEquals($expected, $this->controller->personCheck('user', 'wrongpass'));
 	}
@@ -146,7 +185,7 @@ class OCSControllerTest extends TestCase {
 				$this->equalTo('wrongpass')
 			)->willReturn(false);
 
-		$expected = new DataResponse(null, 101);
+		$expected = new DataResponse([], 101);
 		$this->assertEquals($expected, $this->controller->personCheck('', ''));
 	}
 
@@ -157,7 +196,7 @@ class OCSControllerTest extends TestCase {
 			->with('NotExistingUser')
 			->willReturn(null);
 
-		$expected = new DataResponse('User not found', 404);
+		$expected = new DataResponse(['User not found'], 404);
 		$this->assertEquals($expected, $this->controller->getIdentityProof('NotExistingUser'));
 	}
 

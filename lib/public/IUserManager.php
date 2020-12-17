@@ -2,9 +2,14 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Arthur Schiwon <blizzz@arthur-schiwon.de>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Joas Schilling <coding@schilljs.com>
+ * @author Jörn Friedrich Dreyer <jfd@butonic.de>
  * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @license AGPL-3.0
@@ -19,12 +24,11 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
 namespace OCP;
-
 
 /**
  * Class Manager
@@ -36,12 +40,14 @@ namespace OCP;
  * - postDelete(\OC\User\User $user)
  * - preCreateUser(string $uid, string $password)
  * - postCreateUser(\OC\User\User $user, string $password)
+ * - assignedUserId(string $uid)
+ * - preUnassignedUserId(string $uid)
+ * - postUnassignedUserId(string $uid)
  *
- * @package OC\User
  * @since 8.0.0
  */
 interface IUserManager {
-		/**
+	/**
 	 * register a user backend
 	 *
 	 * @param \OCP\UserInterface $backend
@@ -124,7 +130,7 @@ interface IUserManager {
 	 * @param string $uid
 	 * @param string $password
 	 * @throws \InvalidArgumentException
-	 * @return bool|\OCP\IUser the created user of false
+	 * @return bool|\OCP\IUser the created user or false
 	 * @since 8.0.0
 	 */
 	public function createUser($uid, $password);
@@ -149,6 +155,7 @@ interface IUserManager {
 
 	/**
 	 * @param \Closure $callback
+	 * @psalm-param \Closure(\OCP\IUser):void $callback
 	 * @param string $search
 	 * @since 9.0.0
 	 */
@@ -172,6 +179,7 @@ interface IUserManager {
 
 	/**
 	 * @param \Closure $callback
+	 * @psalm-param \Closure(\OCP\IUser):?bool $callback
 	 * @since 11.0.0
 	 */
 	public function callForSeenUsers(\Closure $callback);

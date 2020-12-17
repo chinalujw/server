@@ -2,13 +2,16 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Arthur Schiwon <blizzz@arthur-schiwon.de>
  * @author Bart Visscher <bartv@thisnet.nl>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Hemanth Kumar Veeranki <hems.india1997@gmail.com>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Michael Göhler <somebody.here@gmx.de>
- * @author Robin McCorkell <robin@mccorkell.me.uk>
+ * @author Morris Jobke <hey@morrisjobke.de>
  * @author Roeland Jago Douma <roeland@famdouma.nl>
- * @author Stefan Weil <sw@weilnetz.de>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
+ * @author Vincent Petry <vincent@nextcloud.com>
  *
  * @license AGPL-3.0
  *
@@ -22,13 +25,16 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
+
 namespace OC\Setup;
 
 use OC\DB\MySqlTools;
 use OCP\IDBConnection;
+use OCP\ILogger;
+use Doctrine\DBAL\Platforms\MySQL80Platform;
 
 class MySQL extends AbstractDatabase {
 	public $dbprettyname = 'MySQL/MariaDB';
@@ -50,11 +56,17 @@ class MySQL extends AbstractDatabase {
 		$this->createDatabase($connection);
 
 		//fill the database if needed
-		$query='select count(*) from information_schema.tables where table_schema=? AND table_name = ?';
-		$result = $connection->executeQuery($query, [$this->dbName, $this->tablePrefix.'users']);
-		$row = $result->fetch();
-		if (!$row or $row['count(*)'] === '0') {
-			\OC_DB::createDbFromStructure($this->dbDefinitionFile);
+		$query = 'select count(*) from information_schema.tables where table_schema=? AND table_name = ?';
+		$connection->executeQuery($query, [$this->dbName, $this->tablePrefix.'users']);
+
+		$connection->close();
+		$connection = $this->connect();
+		try {
+			$connection->connect();
+		} catch (\Exception $e) {
+			$this->logger->logException($e);
+			throw new \OC\DatabaseSetupException($this->trans->t('MySQL username and/or password not valid'),
+				$this->trans->t('You need to enter details of an existing account.'));
 		}
 	}
 
@@ -62,7 +74,7 @@ class MySQL extends AbstractDatabase {
 	 * @param \OC\DB\Connection $connection
 	 */
 	private function createDatabase($connection) {
-		try{
+		try {
 			$name = $this->dbName;
 			$user = $this->dbUser;
 			//we can't use OC_DB functions here because we need to connect as the administrative user.
@@ -70,21 +82,23 @@ class MySQL extends AbstractDatabase {
 			$query = "CREATE DATABASE IF NOT EXISTS `$name` CHARACTER SET $characterSet COLLATE ${characterSet}_bin;";
 			$connection->executeUpdate($query);
 		} catch (\Exception $ex) {
-			$this->logger->error('Database creation failed: {error}', [
+			$this->logger->logException($ex, [
+				'message' => 'Database creation failed.',
+				'level' => ILogger::ERROR,
 				'app' => 'mysql.setup',
-				'error' => $ex->getMessage()
 			]);
 			return;
 		}
 
 		try {
 			//this query will fail if there aren't the right permissions, ignore the error
-			$query="GRANT ALL PRIVILEGES ON `$name` . * TO '$user'";
+			$query = "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, EVENT, TRIGGER ON `$name` . * TO '$user'";
 			$connection->executeUpdate($query);
 		} catch (\Exception $ex) {
-			$this->logger->debug('Could not automatically grant privileges, this can be ignored if database user already had privileges: {error}', [
+			$this->logger->logException($ex, [
+				'message' => 'Could not automatically grant privileges, this can be ignored if database user already had privileges.',
+				'level' => ILogger::DEBUG,
 				'app' => 'mysql.setup',
-				'error' => $ex->getMessage()
 			]);
 		}
 	}
@@ -94,21 +108,29 @@ class MySQL extends AbstractDatabase {
 	 * @throws \OC\DatabaseSetupException
 	 */
 	private function createDBUser($connection) {
-		try{
+		try {
 			$name = $this->dbUser;
 			$password = $this->dbPassword;
 			// we need to create 2 accounts, one for global use and one for local user. if we don't specify the local one,
 			// the anonymous user would take precedence when there is one.
-			$query = "CREATE USER '$name'@'localhost' IDENTIFIED BY '$password'";
-			$connection->executeUpdate($query);
-			$query = "CREATE USER '$name'@'%' IDENTIFIED BY '$password'";
-			$connection->executeUpdate($query);
-		}
-		catch (\Exception $ex){
-			$this->logger->error('Database User creation failed: {error}', [
-                                'app' => 'mysql.setup',
-                                'error' => $ex->getMessage()
-                        ]);
+
+			if ($connection->getDatabasePlatform() instanceof Mysql80Platform) {
+				$query = "CREATE USER '$name'@'localhost' IDENTIFIED WITH mysql_native_password BY '$password'";
+				$connection->executeUpdate($query);
+				$query = "CREATE USER '$name'@'%' IDENTIFIED WITH mysql_native_password BY '$password'";
+				$connection->executeUpdate($query);
+			} else {
+				$query = "CREATE USER '$name'@'localhost' IDENTIFIED BY '$password'";
+				$connection->executeUpdate($query);
+				$query = "CREATE USER '$name'@'%' IDENTIFIED BY '$password'";
+				$connection->executeUpdate($query);
+			}
+		} catch (\Exception $ex) {
+			$this->logger->logException($ex, [
+				'message' => 'Database user creation failed.',
+				'level' => ILogger::ERROR,
+				'app' => 'mysql.setup',
+			]);
 		}
 	}
 
@@ -142,7 +164,7 @@ class MySQL extends AbstractDatabase {
 							$this->dbUser = $adminUser;
 
 							//create a random password so we don't need to store the admin password in the config file
-							$this->dbPassword =  $this->random->generate(30);
+							$this->dbPassword = $this->random->generate(30);
 
 							$this->createDBUser($connection);
 
@@ -156,12 +178,13 @@ class MySQL extends AbstractDatabase {
 					} else {
 						break;
 					}
-				};
+				}
 			}
 		} catch (\Exception $ex) {
-			$this->logger->info('Can not create a new MySQL user, will continue with the provided user: {error}', [
+			$this->logger->logException($ex, [
+				'message' => 'Can not create a new MySQL user, will continue with the provided user.',
+				'level' => ILogger::INFO,
 				'app' => 'mysql.setup',
-				'error' => $ex->getMessage()
 			]);
 		}
 

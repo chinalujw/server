@@ -30,7 +30,7 @@ OCA.LDAP = _.extend(OC.LDAP || {}, {
 	},
 });
 
-$(document).ready(function() {
+window.addEventListener('DOMContentLoaded', function() {
 	$('form[name=renewpassword]').submit(OCA.LDAP.onRenewPassword);
 	
 	if($('#newPassword').length) {
@@ -46,5 +46,6 @@ $(document).ready(function() {
 			t('core', 'Strong password')
 		],
 		drawTitles: true,
+		$addAfter: $('input[name="newPassword-clone"]'),
 	});
 });

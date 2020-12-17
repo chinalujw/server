@@ -22,6 +22,7 @@
 namespace Test\App\AppStore\Fetcher;
 
 use OC\App\AppStore\Fetcher\Fetcher;
+use OC\Files\AppData\AppData;
 use OC\Files\AppData\Factory;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Files\IAppData;
@@ -36,17 +37,17 @@ use OCP\ILogger;
 use Test\TestCase;
 
 abstract class FetcherBase extends TestCase {
-	/** @var Factory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var Factory|\PHPUnit\Framework\MockObject\MockObject */
 	protected $appDataFactory;
-	/** @var IAppData|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IAppData|\PHPUnit\Framework\MockObject\MockObject */
 	protected $appData;
-	/** @var IClientService|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IClientService|\PHPUnit\Framework\MockObject\MockObject */
 	protected $clientService;
-	/** @var ITimeFactory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ITimeFactory|\PHPUnit\Framework\MockObject\MockObject */
 	protected $timeFactory;
-	/** @var IConfig|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	protected $config;
-	/** @var ILogger|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ILogger|\PHPUnit\Framework\MockObject\MockObject */
 	protected $logger;
 	/** @var Fetcher */
 	protected $fetcher;
@@ -55,10 +56,10 @@ abstract class FetcherBase extends TestCase {
 	/** @var string */
 	protected $endpoint;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 		$this->appDataFactory = $this->createMock(Factory::class);
-		$this->appData = $this->createMock(IAppData::class);
+		$this->appData = $this->createMock(AppData::class);
 		$this->appDataFactory->expects($this->once())
 			->method('get')
 			->with('appstore')
@@ -77,6 +78,11 @@ abstract class FetcherBase extends TestCase {
 			->willReturn(true);
 		$this->config
 			->expects($this->at(1))
+			->method('getSystemValue')
+			->with('has_internet_connection', true)
+			->willReturn(true);
+		$this->config
+			->expects($this->at(2))
 			->method('getSystemValue')
 			->with(
 				$this->equalTo('version'),
@@ -114,22 +120,19 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetWithNotExistingFileAndUpToDateTimestampAndVersion() {
 		$this->config
-			->expects($this->at(0))
 			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(1))
-			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(2))
-			->method('getSystemValue')
-			->with(
-				$this->equalTo('version'),
-				$this->anything()
-			)->willReturn('11.0.0.2');
+			->willReturnCallback(function ($var, $default) {
+				if ($var === 'appstoreenabled') {
+					return true;
+				} elseif ($var === 'has_internet_connection') {
+					return true;
+				} elseif ($var === 'appstoreurl') {
+					return 'https://apps.nextcloud.com/api/v1';
+				} elseif ($var === 'version') {
+					return '11.0.0.2';
+				}
+				return $default;
+			});
 
 		$folder = $this->createMock(ISimpleFolder::class);
 		$file = $this->createMock(ISimpleFile::class);
@@ -194,10 +197,10 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetWithAlreadyExistingFileAndOutdatedTimestamp() {
 		$this->config->method('getSystemValue')
-			->willReturnCallback(function($key, $default) {
+			->willReturnCallback(function ($key, $default) {
 				if ($key === 'appstoreenabled') {
 					return true;
-				} else if ($key === 'version') {
+				} elseif ($key === 'version') {
 					return '11.0.0.2';
 				} else {
 					return $default;
@@ -223,7 +226,7 @@ abstract class FetcherBase extends TestCase {
 		$this->timeFactory
 			->expects($this->at(0))
 			->method('getTime')
-			->willReturn(1501);
+			->willReturn(4801);
 		$client = $this->createMock(IClient::class);
 		$this->clientService
 			->expects($this->once())
@@ -270,22 +273,19 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetWithAlreadyExistingFileAndNoVersion() {
 		$this->config
-			->expects($this->at(0))
 			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(1))
-			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(2))
-			->method('getSystemValue')
-			->with(
-				$this->equalTo('version'),
-				$this->anything()
-			)->willReturn('11.0.0.2');
+			->willReturnCallback(function ($var, $default) {
+				if ($var === 'appstoreenabled') {
+					return true;
+				} elseif ($var === 'has_internet_connection') {
+					return true;
+				} elseif ($var === 'appstoreurl') {
+					return 'https://apps.nextcloud.com/api/v1';
+				} elseif ($var === 'version') {
+					return '11.0.0.2';
+				}
+				return $default;
+			});
 
 		$folder = $this->createMock(ISimpleFolder::class);
 		$file = $this->createMock(ISimpleFile::class);
@@ -349,22 +349,19 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetWithAlreadyExistingFileAndOutdatedVersion() {
 		$this->config
-			->expects($this->at(0))
 			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(1))
-			->method('getSystemValue')
-			->with('appstoreenabled', true)
-			->willReturn(true);
-		$this->config
-			->expects($this->at(2))
-			->method('getSystemValue')
-			->with(
-				$this->equalTo('version'),
-				$this->anything()
-			)->willReturn('11.0.0.2');
+			->willReturnCallback(function ($var, $default) {
+				if ($var === 'appstoreenabled') {
+					return true;
+				} elseif ($var === 'has_internet_connection') {
+					return true;
+				} elseif ($var === 'appstoreurl') {
+					return 'https://apps.nextcloud.com/api/v1';
+				} elseif ($var === 'version') {
+					return '11.0.0.2';
+				}
+				return $default;
+			});
 
 		$folder = $this->createMock(ISimpleFolder::class);
 		$file = $this->createMock(ISimpleFile::class);
@@ -427,7 +424,7 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetWithExceptionInClient() {
 		$this->config->method('getSystemValue')
-			->willReturnCallback(function($key, $default) {
+			->willReturnCallback(function ($key, $default) {
 				if ($key === 'appstoreenabled') {
 					return true;
 				} else {
@@ -467,10 +464,10 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetMatchingETag() {
 		$this->config->method('getSystemValue')
-			->willReturnCallback(function($key, $default) {
+			->willReturnCallback(function ($key, $default) {
 				if ($key === 'appstoreenabled') {
 					return true;
-				} else if ($key === 'version') {
+				} elseif ($key === 'version') {
 					return '11.0.0.2';
 				} else {
 					return $default;
@@ -497,11 +494,11 @@ abstract class FetcherBase extends TestCase {
 		$this->timeFactory
 			->expects($this->at(0))
 			->method('getTime')
-			->willReturn(1501);
+			->willReturn(4801);
 		$this->timeFactory
 			->expects($this->at(1))
 			->method('getTime')
-			->willReturn(1502);
+			->willReturn(4802);
 		$client = $this->createMock(IClient::class);
 		$this->clientService
 			->expects($this->once())
@@ -514,7 +511,7 @@ abstract class FetcherBase extends TestCase {
 			->with(
 				$this->equalTo($this->endpoint),
 				$this->equalTo([
-					'timeout' => 10,
+					'timeout' => 60,
 					'headers' => [
 						'If-None-Match' => '"myETag"'
 					]
@@ -523,7 +520,7 @@ abstract class FetcherBase extends TestCase {
 		$response->method('getStatusCode')
 			->willReturn(304);
 
-		$newData = '{"data":[{"id":"MyNewApp","foo":"foo"},{"id":"bar"}],"timestamp":1502,"ncversion":"11.0.0.2","ETag":"\"myETag\""}';
+		$newData = '{"data":[{"id":"MyNewApp","foo":"foo"},{"id":"bar"}],"timestamp":4802,"ncversion":"11.0.0.2","ETag":"\"myETag\""}';
 		$file
 			->expects($this->at(1))
 			->method('putContent')
@@ -548,10 +545,10 @@ abstract class FetcherBase extends TestCase {
 
 	public function testGetNoMatchingETag() {
 		$this->config->method('getSystemValue')
-			->willReturnCallback(function($key, $default) {
+			->willReturnCallback(function ($key, $default) {
 				if ($key === 'appstoreenabled') {
 					return true;
-				} else if ($key === 'version') {
+				} elseif ($key === 'version') {
 					return '11.0.0.2';
 				} else {
 					return $default;
@@ -586,7 +583,7 @@ abstract class FetcherBase extends TestCase {
 			->with(
 				$this->equalTo($this->endpoint),
 				$this->equalTo([
-					'timeout' => 10,
+					'timeout' => 60,
 					'headers' => [
 						'If-None-Match' => '"myETag"',
 					]
@@ -602,7 +599,7 @@ abstract class FetcherBase extends TestCase {
 		$response->method('getHeader')
 			->with($this->equalTo('ETag'))
 			->willReturn('"newETag"');
-		$fileData = '{"data":[{"id":"MyNewApp","foo":"foo"},{"id":"bar"}],"timestamp":1502,"ncversion":"11.0.0.2","ETag":"\"newETag\""}';
+		$fileData = '{"data":[{"id":"MyNewApp","foo":"foo"},{"id":"bar"}],"timestamp":4802,"ncversion":"11.0.0.2","ETag":"\"newETag\""}';
 		$file
 			->expects($this->at(1))
 			->method('putContent')
@@ -614,11 +611,11 @@ abstract class FetcherBase extends TestCase {
 		$this->timeFactory
 			->expects($this->at(0))
 			->method('getTime')
-			->willReturn(1501);
+			->willReturn(4801);
 		$this->timeFactory
 			->expects($this->at(1))
 			->method('getTime')
-			->willReturn(1502);
+			->willReturn(4802);
 
 		$expected = [
 			[
@@ -635,10 +632,10 @@ abstract class FetcherBase extends TestCase {
 
 	public function testFetchAfterUpgradeNoETag() {
 		$this->config->method('getSystemValue')
-			->willReturnCallback(function($key, $default) {
+			->willReturnCallback(function ($key, $default) {
 				if ($key === 'appstoreenabled') {
 					return true;
-				} else if ($key === 'version') {
+				} elseif ($key === 'version') {
 					return '11.0.0.3';
 				} else {
 					return $default;
@@ -673,7 +670,7 @@ abstract class FetcherBase extends TestCase {
 			->with(
 				$this->equalTo($this->endpoint),
 				$this->equalTo([
-					'timeout' => 10,
+					'timeout' => 60,
 				])
 			)
 			->willReturn($response);

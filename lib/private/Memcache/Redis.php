@@ -2,10 +2,13 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
  * @author Jörn Friedrich Dreyer <jfd@butonic.de>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
+ * @author Robin McCorkell <robin@mccorkell.me.uk>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  * @author Stefan Weil <sw@weilnetz.de>
  *
  * @license AGPL-3.0
@@ -20,7 +23,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -143,7 +146,7 @@ class Redis extends Cache implements IMemcacheTTL {
 			$result = self::$cache->multi()
 				->set($this->getNameSpace() . $key, $new)
 				->exec();
-			return ($result === false) ? false : true;
+			return $result !== false;
 		}
 		self::$cache->unwatch();
 		return false;
@@ -162,7 +165,7 @@ class Redis extends Cache implements IMemcacheTTL {
 			$result = self::$cache->multi()
 				->del($this->getNameSpace() . $key)
 				->exec();
-			return ($result === false) ? false : true;
+			return $result !== false;
 		}
 		self::$cache->unwatch();
 		return false;
@@ -172,8 +175,7 @@ class Redis extends Cache implements IMemcacheTTL {
 		self::$cache->expire($this->getNameSpace() . $key, $ttl);
 	}
 
-	static public function isAvailable() {
+	public static function isAvailable() {
 		return \OC::$server->getGetRedisFactory()->isAvailable();
 	}
 }
-

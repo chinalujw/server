@@ -23,45 +23,85 @@
 
 namespace Test\Template;
 
+use OC\AppConfig;
+use OC\Files\AppData\AppData;
 use OC\Files\AppData\Factory;
+use OC\Template\IconsCacher;
 use OC\Template\SCSSCacher;
 use OCA\Theming\ThemingDefaults;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Files\IAppData;
 use OCP\Files\NotFoundException;
 use OCP\Files\SimpleFS\ISimpleFile;
 use OCP\Files\SimpleFS\ISimpleFolder;
 use OCP\ICache;
+use OCP\ICacheFactory;
 use OCP\IConfig;
 use OCP\ILogger;
 use OCP\IURLGenerator;
 
 class SCSSCacherTest extends \Test\TestCase {
-	/** @var ILogger|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ILogger|\PHPUnit\Framework\MockObject\MockObject */
 	protected $logger;
-	/** @var IAppData|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IAppData|\PHPUnit\Framework\MockObject\MockObject */
 	protected $appData;
-	/** @var IURLGenerator|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IURLGenerator|\PHPUnit\Framework\MockObject\MockObject */
 	protected $urlGenerator;
-	/** @var IConfig|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IConfig|\PHPUnit\Framework\MockObject\MockObject */
 	protected $config;
-	/** @var ThemingDefaults|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ThemingDefaults|\PHPUnit\Framework\MockObject\MockObject */
 	protected $themingDefaults;
 	/** @var SCSSCacher */
 	protected $scssCacher;
-	/** @var ICache|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ICache|\PHPUnit\Framework\MockObject\MockObject */
 	protected $depsCache;
+	/** @var ICacheFactory|\PHPUnit\Framework\MockObject\MockObject */
+	protected $cacheFactory;
+	/** @var IconsCacher|\PHPUnit\Framework\MockObject\MockObject */
+	protected $iconsCacher;
+	/** @var ITimeFactory|\PHPUnit\Framework\MockObject\MockObject */
+	protected $timeFactory;
+	/** @var AppConfig|\PHPUnit\Framework\MockObject\MockObject */
+	protected $appConfig;
 
-	protected function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 		$this->logger = $this->createMock(ILogger::class);
-		$this->appData = $this->createMock(IAppData::class);
-		/** @var Factory|\PHPUnit_Framework_MockObject_MockObject $factory */
+		$this->appData = $this->createMock(AppData::class);
+		$this->iconsCacher = $this->createMock(IconsCacher::class);
+		$this->timeFactory = $this->createMock(ITimeFactory::class);
+
+		/** @var Factory|\PHPUnit\Framework\MockObject\MockObject $factory */
 		$factory = $this->createMock(Factory::class);
 		$factory->method('get')->with('css')->willReturn($this->appData);
+
 		$this->urlGenerator = $this->createMock(IURLGenerator::class);
+		$this->urlGenerator->expects($this->any())
+			->method('getBaseUrl')
+			->willReturn('http://localhost/nextcloud');
+
 		$this->config = $this->createMock(IConfig::class);
+		$this->config->expects($this->any())
+			->method('getAppValue')
+			->will($this->returnCallback(function ($appId, $configKey, $defaultValue) {
+				return $defaultValue;
+			}));
+		$this->cacheFactory = $this->createMock(ICacheFactory::class);
 		$this->depsCache = $this->createMock(ICache::class);
+		$this->cacheFactory->expects($this->at(0))
+			->method('createDistributed')
+			->willReturn($this->depsCache);
+
 		$this->themingDefaults = $this->createMock(ThemingDefaults::class);
+		$this->themingDefaults->expects($this->any())->method('getScssVariables')->willReturn([]);
+
+		$iconsFile = $this->createMock(ISimpleFile::class);
+		$this->iconsCacher->expects($this->any())
+			->method('getCachedCSS')
+			->willReturn($iconsFile);
+
+		$this->appConfig = $this->createMock(AppConfig::class);
+
 		$this->scssCacher = new SCSSCacher(
 			$this->logger,
 			$factory,
@@ -69,13 +109,11 @@ class SCSSCacherTest extends \Test\TestCase {
 			$this->config,
 			$this->themingDefaults,
 			\OC::$SERVERROOT,
-			$this->depsCache
+			$this->cacheFactory,
+			$this->iconsCacher,
+			$this->timeFactory,
+			$this->appConfig
 		);
-		$this->themingDefaults->expects($this->any())->method('getScssVariables')->willReturn([]);
-
-		$this->urlGenerator->expects($this->any())
-			->method('getBaseUrl')
-			->willReturn('http://localhost/nextcloud');
 	}
 
 	public function testProcessUncachedFileNoAppDataFolder() {
@@ -85,23 +123,25 @@ class SCSSCacherTest extends \Test\TestCase {
 
 		$this->appData->expects($this->once())->method('getFolder')->with('core')->willThrowException(new NotFoundException());
 		$this->appData->expects($this->once())->method('newFolder')->with('core')->willReturn($folder);
+		$this->appData->method('getDirectoryListing')->willReturn([]);
 
 		$fileDeps = $this->createMock(ISimpleFile::class);
 		$gzfile = $this->createMock(ISimpleFile::class);
-		$filePrefix = md5('http://localhost/nextcloud') . '-';
+		$filePrefix = substr(md5(\OC_Util::getVersionString('core')), 0, 4) . '-' .
+					  substr(md5('http://localhost/nextcloud/index.php'), 0, 4) . '-';
 
 		$folder->method('getFile')
-			->will($this->returnCallback(function($path) use ($file, $gzfile, $filePrefix) {
+			->willReturnCallback(function ($path) use ($file, $gzfile, $filePrefix) {
 				if ($path === $filePrefix.'styles.css') {
 					return $file;
-				} else if ($path === $filePrefix.'styles.css.deps') {
+				} elseif ($path === $filePrefix.'styles.css.deps') {
 					throw new NotFoundException();
-				} else if ($path === $filePrefix.'styles.css.gzip') {
+				} elseif ($path === $filePrefix.'styles.css.gzip') {
 					return $gzfile;
 				} else {
 					$this->fail();
 				}
-			}));
+			});
 		$folder->expects($this->once())
 			->method('newFile')
 			->with($filePrefix.'styles.css.deps')
@@ -111,6 +151,10 @@ class SCSSCacherTest extends \Test\TestCase {
 			->method('getBaseUrl')
 			->willReturn('http://localhost/nextcloud');
 
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
+
 		$actual = $this->scssCacher->process(\OC::$SERVERROOT, '/core/css/styles.scss', 'core');
 		$this->assertTrue($actual);
 	}
@@ -118,28 +162,34 @@ class SCSSCacherTest extends \Test\TestCase {
 	public function testProcessUncachedFile() {
 		$folder = $this->createMock(ISimpleFolder::class);
 		$this->appData->expects($this->once())->method('getFolder')->with('core')->willReturn($folder);
+		$this->appData->method('getDirectoryListing')->willReturn([]);
 		$file = $this->createMock(ISimpleFile::class);
 		$file->expects($this->any())->method('getSize')->willReturn(1);
 		$fileDeps = $this->createMock(ISimpleFile::class);
 		$gzfile = $this->createMock(ISimpleFile::class);
-		$filePrefix = md5('http://localhost/nextcloud') . '-';
+		$filePrefix = substr(md5(\OC_Util::getVersionString('core')), 0, 4) . '-' .
+					  substr(md5('http://localhost/nextcloud/index.php'), 0, 4) . '-';
 
 		$folder->method('getFile')
-			->will($this->returnCallback(function($path) use ($file, $gzfile, $filePrefix) {
+			->willReturnCallback(function ($path) use ($file, $gzfile, $filePrefix) {
 				if ($path === $filePrefix.'styles.css') {
 					return $file;
-				} else if ($path === $filePrefix.'styles.css.deps') {
+				} elseif ($path === $filePrefix.'styles.css.deps') {
 					throw new NotFoundException();
-				} else if ($path === $filePrefix.'styles.css.gzip') {
+				} elseif ($path === $filePrefix.'styles.css.gzip') {
 					return $gzfile;
-				}else {
+				} else {
 					$this->fail();
 				}
-			}));
+			});
 		$folder->expects($this->once())
 			->method('newFile')
 			->with($filePrefix.'styles.css.deps')
 			->willReturn($fileDeps);
+
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
 
 		$actual = $this->scssCacher->process(\OC::$SERVERROOT, '/core/css/styles.scss', 'core');
 		$this->assertTrue($actual);
@@ -148,23 +198,29 @@ class SCSSCacherTest extends \Test\TestCase {
 	public function testProcessCachedFile() {
 		$folder = $this->createMock(ISimpleFolder::class);
 		$this->appData->expects($this->once())->method('getFolder')->with('core')->willReturn($folder);
+		$this->appData->method('getDirectoryListing')->willReturn([]);
 		$file = $this->createMock(ISimpleFile::class);
 		$fileDeps = $this->createMock(ISimpleFile::class);
 		$fileDeps->expects($this->any())->method('getSize')->willReturn(1);
 		$gzFile = $this->createMock(ISimpleFile::class);
-		$filePrefix = md5('http://localhost/nextcloud') . '-';
+		$filePrefix = substr(md5(\OC_Util::getVersionString('core')), 0, 4) . '-' .
+					  substr(md5('http://localhost/nextcloud/index.php'), 0, 4) . '-';
 
 		$folder->method('getFile')
-			->will($this->returnCallback(function($name) use ($file, $fileDeps, $gzFile, $filePrefix) {
+			->willReturnCallback(function ($name) use ($file, $fileDeps, $gzFile, $filePrefix) {
 				if ($name === $filePrefix.'styles.css') {
 					return $file;
-				} else if ($name === $filePrefix.'styles.css.deps') {
+				} elseif ($name === $filePrefix.'styles.css.deps') {
 					return $fileDeps;
-				} else if ($name === $filePrefix.'styles.css.gzip') {
+				} elseif ($name === $filePrefix.'styles.css.gzip') {
 					return $gzFile;
 				}
 				$this->fail();
-			}));
+			});
+
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
 
 		$actual = $this->scssCacher->process(\OC::$SERVERROOT, '/core/css/styles.scss', 'core');
 		$this->assertTrue($actual);
@@ -178,6 +234,7 @@ class SCSSCacherTest extends \Test\TestCase {
 			->willReturn($folder);
 		$folder->method('getName')
 			->willReturn('core');
+		$this->appData->method('getDirectoryListing')->willReturn([]);
 
 		$file = $this->createMock(ISimpleFile::class);
 
@@ -185,18 +242,23 @@ class SCSSCacherTest extends \Test\TestCase {
 		$fileDeps->expects($this->any())->method('getSize')->willReturn(1);
 
 		$gzFile = $this->createMock(ISimpleFile::class);
-		$filePrefix = md5('http://localhost/nextcloud') . '-';
+		$filePrefix = substr(md5(\OC_Util::getVersionString('core')), 0, 4) . '-' .
+					  substr(md5('http://localhost/nextcloud/index.php'), 0, 4) . '-';
 		$folder->method('getFile')
-			->will($this->returnCallback(function($name) use ($file, $fileDeps, $gzFile, $filePrefix) {
+			->willReturnCallback(function ($name) use ($file, $fileDeps, $gzFile, $filePrefix) {
 				if ($name === $filePrefix.'styles.css') {
 					return $file;
-				} else if ($name === $filePrefix.'styles.css.deps') {
+				} elseif ($name === $filePrefix.'styles.css.deps') {
 					return $fileDeps;
-				} else if ($name === $filePrefix.'styles.css.gzip') {
+				} elseif ($name === $filePrefix.'styles.css.gzip') {
 					return $gzFile;
 				}
 				$this->fail();
-			}));
+			});
+
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
 
 		$actual = $this->scssCacher->process(\OC::$SERVERROOT, '/core/css/styles.scss', 'core');
 		$this->assertTrue($actual);
@@ -207,7 +269,10 @@ class SCSSCacherTest extends \Test\TestCase {
 		$folder = $this->createMock(ISimpleFolder::class);
 
 		$folder->expects($this->at(0))->method('getFile')->with($fileNameCSS)->willThrowException(new NotFoundException());
-		$actual = self::invokePrivate($this->scssCacher, 'isCached', [$fileNameCSS, $folder]);
+		$this->appData->expects($this->any())
+			->method('getFolder')
+			->willReturn($folder);
+		$actual = self::invokePrivate($this->scssCacher, 'isCached', [$fileNameCSS, 'core']);
 		$this->assertFalse($actual);
 	}
 
@@ -218,17 +283,20 @@ class SCSSCacherTest extends \Test\TestCase {
 
 		$file->expects($this->once())->method('getSize')->willReturn(1);
 		$folder->method('getFile')
-			->will($this->returnCallback(function($path) use ($file) {
+			->willReturnCallback(function ($path) use ($file) {
 				if ($path === 'styles.css') {
 					return $file;
-				} else if ($path === 'styles.css.deps') {
+				} elseif ($path === 'styles.css.deps') {
 					throw new NotFoundException();
 				} else {
 					$this->fail();
 				}
-			}));
+			});
 
-		$actual = self::invokePrivate($this->scssCacher, 'isCached', [$fileNameCSS, $folder]);
+		$this->appData->expects($this->any())
+			->method('getFolder')
+			->willReturn($folder);
+		$actual = self::invokePrivate($this->scssCacher, 'isCached', [$fileNameCSS, 'core']);
 		$this->assertFalse($actual);
 	}
 	public function testCacheNoFile() {
@@ -243,16 +311,20 @@ class SCSSCacherTest extends \Test\TestCase {
 		$path = \OC::$SERVERROOT . '/core/css/';
 
 		$folder->method('getFile')->willThrowException(new NotFoundException());
-		$folder->method('newFile')->will($this->returnCallback(function($fileName) use ($file, $depsFile, $gzipFile) {
+		$folder->method('newFile')->willReturnCallback(function ($fileName) use ($file, $depsFile, $gzipFile) {
 			if ($fileName === 'styles.css') {
 				return $file;
-			} else if ($fileName === 'styles.css.deps') {
+			} elseif ($fileName === 'styles.css.deps') {
 				return $depsFile;
-			} else if ($fileName === 'styles.css.gzip') {
+			} elseif ($fileName === 'styles.css.gzip') {
 				return $gzipFile;
 			}
 			throw new \Exception();
-		}));
+		});
+
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
 
 		$file->expects($this->once())->method('putContent');
 		$depsFile->expects($this->once())->method('putContent');
@@ -273,20 +345,24 @@ class SCSSCacherTest extends \Test\TestCase {
 		$webDir = "core/css";
 		$path = \OC::$SERVERROOT;
 
-		$folder->method('getFile')->will($this->returnCallback(function($fileName) use ($file, $depsFile, $gzipFile) {
+		$folder->method('getFile')->willReturnCallback(function ($fileName) use ($file, $depsFile, $gzipFile) {
 			if ($fileName === 'styles.css') {
 				return $file;
-			} else if ($fileName === 'styles.css.deps') {
+			} elseif ($fileName === 'styles.css.deps') {
 				return $depsFile;
-			} else if ($fileName === 'styles.css.gzip') {
+			} elseif ($fileName === 'styles.css.gzip') {
 				return $gzipFile;
 			}
 			throw new \Exception();
-		}));
+		});
 
 		$file->expects($this->once())->method('putContent');
 		$depsFile->expects($this->once())->method('putContent');
 		$gzipFile->expects($this->once())->method('putContent');
+
+		$this->iconsCacher->expects($this->any())
+			->method('setIconsCss')
+			->willReturn('scss {}');
 
 		$actual = self::invokePrivate($this->scssCacher, 'cache', [$path, $fileNameCSS, $fileNameSCSS, $folder, $webDir]);
 		$this->assertTrue($actual);
@@ -303,19 +379,23 @@ class SCSSCacherTest extends \Test\TestCase {
 		$webDir = "tests/data/scss";
 		$path = \OC::$SERVERROOT . $webDir;
 
-		$folder->method('getFile')->will($this->returnCallback(function($fileName) use ($file, $depsFile, $gzipFile) {
+		$folder->method('getFile')->willReturnCallback(function ($fileName) use ($file, $depsFile, $gzipFile) {
 			if ($fileName === 'styles-success.css') {
 				return $file;
-			} else if ($fileName === 'styles-success.css.deps') {
+			} elseif ($fileName === 'styles-success.css.deps') {
 				return $depsFile;
-			} else if ($fileName === 'styles-success.css.gzip') {
+			} elseif ($fileName === 'styles-success.css.gzip') {
 				return $gzipFile;
 			}
 			throw new \Exception();
-		}));
+		});
+
+		$this->iconsCacher->expects($this->at(0))
+			->method('setIconsCss')
+			->willReturn('body{background-color:#0082c9}');
 
 		$file->expects($this->at(0))->method('putContent')->with($this->callback(
-			function ($content){
+			function ($content) {
 				return 'body{background-color:#0082c9}' === $content;
 			}));
 		$depsFile->expects($this->at(0))->method('putContent')->with($this->callback(
@@ -351,27 +431,28 @@ class SCSSCacherTest extends \Test\TestCase {
 		$this->assertFalse($actual);
 	}
 
-	public function testRebaseUrls() {
-		$webDir = 'apps/files/css';
-		$css = '#id { background-image: url(\'../img/image.jpg\'); }';
-		$actual = self::invokePrivate($this->scssCacher, 'rebaseUrls', [$css, $webDir]);
-		$expected = '#id { background-image: url(\'../../../apps/files/css/../img/image.jpg\'); }';
-		$this->assertEquals($expected, $actual);
+	public function dataRebaseUrls() {
+		return [
+			['#id { background-image: url(\'../img/image.jpg\'); }','#id { background-image: url(\'/apps/files/css/../img/image.jpg\'); }'],
+			['#id { background-image: url("../img/image.jpg"); }','#id { background-image: url(\'/apps/files/css/../img/image.jpg\'); }'],
+			['#id { background-image: url(\'/img/image.jpg\'); }','#id { background-image: url(\'/img/image.jpg\'); }'],
+			['#id { background-image: url("http://example.com/test.jpg"); }','#id { background-image: url("http://example.com/test.jpg"); }'],
+		];
 	}
 
-	public function testRebaseUrlsIgnoreFrontendController() {
-		$this->config->expects($this->once())->method('getSystemValue')->with('htaccess.IgnoreFrontController', false)->willReturn(true);
-		$webDir = 'apps/files/css';
-		$css = '#id { background-image: url(\'../img/image.jpg\'); }';
-		$actual = self::invokePrivate($this->scssCacher, 'rebaseUrls', [$css, $webDir]);
-		$expected = '#id { background-image: url(\'../../apps/files/css/../img/image.jpg\'); }';
+	/**
+	 * @dataProvider dataRebaseUrls
+	 */
+	public function testRebaseUrls($scss, $expected) {
+		$webDir = '/apps/files/css';
+		$actual = self::invokePrivate($this->scssCacher, 'rebaseUrls', [$scss, $webDir]);
 		$this->assertEquals($expected, $actual);
 	}
 
 	public function dataGetCachedSCSS() {
 		return [
-			['core', 'core/css/styles.scss', '/css/core/styles.css'],
-			['files', 'apps/files/css/styles.scss', '/css/files/styles.css']
+			['core', 'core/css/styles.scss', '/css/core/styles.css', \OC_Util::getVersionString()],
+			['files', 'apps/files/css/styles.scss', '/css/files/styles.css', \OC_App::getAppVersion('files')]
 		];
 	}
 
@@ -381,16 +462,92 @@ class SCSSCacherTest extends \Test\TestCase {
 	 * @param $result
 	 * @dataProvider dataGetCachedSCSS
 	 */
-	public function testGetCachedSCSS($appName, $fileName, $result) {
+	public function testGetCachedSCSS($appName, $fileName, $result, $version) {
 		$this->urlGenerator->expects($this->once())
 			->method('linkToRoute')
 			->with('core.Css.getCss', [
-				'fileName' => md5('http://localhost/nextcloud') . '-styles.css',
-				'appName' => $appName
+				'fileName' => substr(md5($version), 0, 4) . '-' .
+							  substr(md5('http://localhost/nextcloud/index.php'), 0, 4) . '-styles.css',
+				'appName' => $appName,
+				'v' => 0,
 			])
 			->willReturn(\OC::$WEBROOT . $result);
 		$actual = $this->scssCacher->getCachedSCSS($appName, $fileName);
 		$this->assertEquals(substr($result, 1), $actual);
 	}
 
+	private function randomString() {
+		return sha1(uniqid(mt_rand(), true));
+	}
+
+	private function rrmdir($directory) {
+		$files = array_diff(scandir($directory), ['.','..']);
+		foreach ($files as $file) {
+			if (is_dir($directory . '/' . $file)) {
+				$this->rrmdir($directory . '/' . $file);
+			} else {
+				unlink($directory . '/' . $file);
+			}
+		}
+		return rmdir($directory);
+	}
+
+	public function dataGetWebDir() {
+		return [
+			// Root installation
+			['/http/core/css', 		'core', '', '/http', '/core/css'],
+			['/http/apps/scss/css', 'scss', '', '/http', '/apps/scss/css'],
+			['/srv/apps2/scss/css', 'scss', '', '/http', '/apps2/scss/css'],
+			// Sub directory install
+			['/http/nextcloud/core/css', 	  'core', 	'/nextcloud', '/http/nextcloud', '/nextcloud/core/css'],
+			['/http/nextcloud/apps/scss/css', 'scss', 	'/nextcloud', '/http/nextcloud', '/nextcloud/apps/scss/css'],
+			['/srv/apps2/scss/css', 		  'scss', 	'/nextcloud', '/http/nextcloud', '/apps2/scss/css']
+		];
+	}
+
+	/**
+	 * @param $path
+	 * @param $appName
+	 * @param $webRoot
+	 * @param $serverRoot
+	 * @dataProvider dataGetWebDir
+	 */
+	public function testgetWebDir($path, $appName, $webRoot, $serverRoot, $correctWebDir) {
+		$tmpDir = sys_get_temp_dir().'/'.$this->randomString();
+		// Adding fake apps folder and create fake app install
+		\OC::$APPSROOTS[] = [
+			'path' => $tmpDir.'/srv/apps2',
+			'url' => '/apps2',
+			'writable' => false
+		];
+		mkdir($tmpDir.$path, 0777, true);
+		$actual = self::invokePrivate($this->scssCacher, 'getWebDir', [$tmpDir.$path, $appName, $tmpDir.$serverRoot, $webRoot]);
+		$this->assertEquals($correctWebDir, $actual);
+		array_pop(\OC::$APPSROOTS);
+		$this->rrmdir($tmpDir.$path);
+	}
+
+	public function testResetCache() {
+		$file = $this->createMock(ISimpleFile::class);
+		$file->expects($this->once())
+			->method('delete');
+
+		$folder = $this->createMock(ISimpleFolder::class);
+		$folder->expects($this->once())
+			->method('getDirectoryListing')
+			->willReturn([$file]);
+
+		$cache = $this->createMock(ICache::class);
+		$this->cacheFactory->expects($this->exactly(2))
+			->method('createDistributed')
+			->willReturn($cache);
+		$cache->expects($this->exactly(2))
+			->method('clear')
+			->with('');
+		$this->appData->expects($this->once())
+			->method('getDirectoryListing')
+			->willReturn([$folder]);
+
+		$this->scssCacher->resetCache();
+	}
 }

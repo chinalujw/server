@@ -24,46 +24,38 @@
 use Behat\Behat\Context\Context;
 
 class FilesAppContext implements Context, ActorAwareInterface {
-
 	use ActorAware;
+	use FileListAncestorSetter;
 
 	/**
 	 * @return array
 	 */
 	public static function sections() {
 		return [ "All files" => "files",
-				 "Recent" => "recent",
-				 "Favorites" => "favorites",
-				 "Shared with you" => "sharingin",
-				 "Shared with others" => "sharingout",
-				 "Shared by link" => "sharinglinks",
-				 "Tags" => "systemtagsfilter",
-				 "Deleted files" => "trashbin" ];
+			"Recent" => "recent",
+			"Favorites" => "favorites",
+			"Shared with you" => "sharingin",
+			"Shared with others" => "sharingout",
+			"Shared by link" => "sharinglinks",
+			"Tags" => "systemtagsfilter",
+			"Deleted files" => "trashbin" ];
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function appNavigation() {
-		return Locator::forThe()->id("app-navigation")->
-				describedAs("App navigation");
+	private static function appMenu() {
+		return Locator::forThe()->id("appmenu")->
+				describedAs("App menu in header");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function appNavigationSectionItemFor($sectionText) {
-		return Locator::forThe()->xpath("//li[normalize-space() = '$sectionText']")->
-				descendantOf(self::appNavigation())->
-				describedAs($sectionText . " section item in App Navigation");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function appNavigationCurrentSectionItem() {
-		return Locator::forThe()->css(".active")->descendantOf(self::appNavigation())->
-				describedAs("Current section item in App Navigation");
+	public static function filesItemInAppMenu() {
+		return Locator::forThe()->xpath("/li[@data-id = 'files']")->
+				descendantOf(self::appMenu())->
+				describedAs("Files item in app menu in header");
 	}
 
 	/**
@@ -87,281 +79,216 @@ class FilesAppContext implements Context, ActorAwareInterface {
 	/**
 	 * @return Locator
 	 */
-	public static function detailsViewForSection($section) {
-		return Locator::forThe()->xpath("/preceding-sibling::*[position() = 1 and @id = 'app-sidebar']")->
-				descendantOf(self::mainViewForSection($section))->
-				describedAs("Details view for section $section in Files app");
+	public static function detailsView() {
+		return Locator::forThe()->xpath("//*[@id=\"app-sidebar\" or contains(@class, 'app-sidebar')]")->
+				describedAs("Details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function currentSectionDetailsView() {
-		return Locator::forThe()->xpath("/preceding-sibling::*[position() = 1 and @id = 'app-sidebar']")->
-				descendantOf(self::currentSectionMainView())->
-				describedAs("Current section details view in Files app");
+	public static function closeDetailsViewButton() {
+		return Locator::forThe()->css(".icon-close")->
+				descendantOf(self::detailsView())->
+				describedAs("Close details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function fileDetailsInCurrentSectionDetailsViewWithText($fileDetailsText) {
+	public static function fileNameInDetailsView() {
+		return Locator::forThe()->css(".app-sidebar-header__title")->
+				descendantOf(self::detailsView())->
+				describedAs("File name in details view in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function favoriteActionInFileDetailsInDetailsView() {
+		return Locator::forThe()->css(".app-sidebar-header__star")->
+				descendantOf(self::fileDetailsInDetailsView())->
+				describedAs("Favorite action in file details in details view in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function notFavoritedStateIconInFileDetailsInDetailsView() {
+		return Locator::forThe()->css(".icon-star")->
+				descendantOf(self::favoriteActionInFileDetailsInDetailsView())->
+				describedAs("Not favorited state icon in file details in details view in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function favoritedStateIconInFileDetailsInDetailsView() {
+		return Locator::forThe()->css(".icon-starred")->
+				descendantOf(self::favoriteActionInFileDetailsInDetailsView())->
+				describedAs("Favorited state icon in file details in details view in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function fileDetailsInDetailsViewWithText($fileDetailsText) {
 		return Locator::forThe()->xpath("//span[normalize-space() = '$fileDetailsText']")->
-				descendantOf(self::fileDetailsInCurrentSectionDetailsView())->
-				describedAs("File details with text \"$fileDetailsText\" in current section details view in Files app");
+				descendantOf(self::fileDetailsInDetailsView())->
+				describedAs("File details with text \"$fileDetailsText\" in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	private static function fileDetailsInCurrentSectionDetailsView() {
-		return Locator::forThe()->css(".file-details")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("File details in current section details view in Files app");
+	private static function fileDetailsInDetailsView() {
+		return Locator::forThe()->css(".app-sidebar-header__desc")->
+				descendantOf(self::detailsView())->
+				describedAs("File details in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function inputFieldForTagsInCurrentSectionDetails() {
+	public static function inputFieldForTagsInDetailsView() {
 		return Locator::forThe()->css(".systemTagsInfoView")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("Input field for tags in current section details view in Files app");
+				descendantOf(self::detailsView())->
+				describedAs("Input field for tags in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function tabHeaderInCurrentSectionDetailsViewNamed($tabHeaderName) {
+	public static function itemInInputFieldForTagsInDetailsViewForTag($tag) {
+		return Locator::forThe()->xpath("//span[normalize-space() = '$tag']")->
+				descendantOf(self::inputFieldForTagsInDetailsView())->
+				describedAs("Item in input field for tags in details view for tag $tag in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function itemInDropdownForTag($tag) {
+		return Locator::forThe()->xpath("//*[contains(concat(' ', normalize-space(@class), ' '), ' select2-result-label ')]//span[normalize-space() = '$tag']/ancestor::li")->
+				descendantOf(self::select2Dropdown())->
+				describedAs("Item in dropdown for tag $tag in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function checkmarkInItemInDropdownForTag($tag) {
+		return Locator::forThe()->css(".checkmark")->
+				descendantOf(self::itemInDropdownForTag($tag))->
+				describedAs("Checkmark in item in dropdown for tag $tag in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	private static function select2Dropdown() {
+		return Locator::forThe()->css("#select2-drop")->
+				describedAs("Select2 dropdown in Files app");
+	}
+
+	/**
+	 * @return Locator
+	 */
+	public static function tabHeaderInDetailsViewNamed($tabHeaderName) {
 		return Locator::forThe()->xpath("//li[normalize-space() = '$tabHeaderName']")->
-				descendantOf(self::tabHeadersInCurrentSectionDetailsView())->
-				describedAs("Tab header named $tabHeaderName in current section details view in Files app");
+				descendantOf(self::tabHeadersInDetailsView())->
+				describedAs("Tab header named $tabHeaderName in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	private static function tabHeadersInCurrentSectionDetailsView() {
-		return Locator::forThe()->css(".tabHeaders")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("Tab headers in current section details view in Files app");
+	private static function tabHeadersInDetailsView() {
+		return Locator::forThe()->css(".app-sidebar-tabs__nav")->
+				descendantOf(self::detailsView())->
+				describedAs("Tab headers in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function tabInCurrentSectionDetailsViewNamed($tabName) {
-		return Locator::forThe()->xpath("//div[@id=//*[contains(concat(' ', normalize-space(@class), ' '), ' tabHeader ') and normalize-space() = '$tabName']/@data-tabid]")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("Tab named $tabName in current section details view in Files app");
+	public static function tabInDetailsViewNamed($tabName) {
+		return Locator::forThe()->xpath("//div[contains(concat(' ', normalize-space(@class), ' '), ' app-sidebar-tabs__content ')]/section[@aria-labelledby = '$tabName' and @role = 'tabpanel']")->
+				descendantOf(self::detailsView())->
+				describedAs("Tab named $tabName in details view in Files app");
 	}
 
 	/**
 	 * @return Locator
 	 */
-	public static function loadingIconForTabInCurrentSectionDetailsViewNamed($tabName) {
-		return Locator::forThe()->css(".loading")->
-				descendantOf(self::tabInCurrentSectionDetailsViewNamed($tabName))->
-				describedAs("Loading icon for tab named $tabName in current section details view in Files app");
+	public static function loadingIconForTabInDetailsViewNamed($tabName) {
+		return Locator::forThe()->css(".icon-loading")->
+				descendantOf(self::tabInDetailsViewNamed($tabName))->
+				describedAs("Loading icon for tab named $tabName in details view in Files app");
 	}
 
 	/**
-	 * @return Locator
+	 * @Given I open the Files app
 	 */
-	public static function shareLinkCheckbox() {
-		// forThe()->checkbox("Share link") can not be used here; that would
-		// return the checkbox itself, but the element that the user interacts
-		// with is the label.
-		return Locator::forThe()->xpath("//label[normalize-space() = 'Share link']")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("Share link checkbox in the details view in Files app");
+	public function iOpenTheFilesApp() {
+		$this->actor->find(self::filesItemInAppMenu(), 10)->click();
 	}
 
 	/**
-	 * @return Locator
+	 * @Given I close the details view
 	 */
-	public static function shareLinkField() {
-		return Locator::forThe()->css(".linkText")->descendantOf(self::currentSectionDetailsView())->
-				describedAs("Share link field in the details view in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function passwordProtectCheckbox() {
-		// forThe()->checkbox("Password protect") can not be used here; that
-		// would return the checkbox itself, but the element that the user
-		// interacts with is the label.
-		return Locator::forThe()->xpath("//label[normalize-space() = 'Password protect']")->
-				descendantOf(self::currentSectionDetailsView())->
-				describedAs("Password protect checkbox in the details view in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function passwordProtectField() {
-		return Locator::forThe()->css(".linkPassText")->descendantOf(self::currentSectionDetailsView())->
-				describedAs("Password protect field in the details view in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function passwordProtectWorkingIcon() {
-		return Locator::forThe()->css(".linkPass .icon-loading-small")->descendantOf(self::currentSectionDetailsView())->
-				describedAs("Password protect working icon in the details view in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function rowForFile($fileName) {
-		return Locator::forThe()->xpath("//*[@id = 'fileList']//span[contains(concat(' ', normalize-space(@class), ' '), ' nametext ') and normalize-space() = '$fileName']/ancestor::tr")->
-				descendantOf(self::currentSectionMainView())->
-				describedAs("Row for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function favoriteActionForFile($fileName) {
-		return Locator::forThe()->css(".action-favorite")->descendantOf(self::rowForFile($fileName))->
-				describedAs("Favorite action for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function favoritedStateIconForFile($fileName) {
-		return Locator::forThe()->css(".icon-starred")->descendantOf(self::favoriteActionForFile($fileName))->
-				describedAs("Favorited state icon for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function mainLinkForFile($fileName) {
-		return Locator::forThe()->css(".name")->descendantOf(self::rowForFile($fileName))->
-				describedAs("Main link for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function shareActionForFile($fileName) {
-		return Locator::forThe()->css(".action-share")->descendantOf(self::rowForFile($fileName))->
-				describedAs("Share action for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function fileActionsMenuButtonForFile($fileName) {
-		return Locator::forThe()->css(".action-menu")->descendantOf(self::rowForFile($fileName))->
-				describedAs("File actions menu button for file $fileName in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function fileActionsMenu() {
-		return Locator::forThe()->css(".fileActionsMenu")->
-				describedAs("File actions menu in Files app");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function detailsMenuItem() {
-		return self::fileActionsMenuItemFor("Details");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	public static function viewFileInFolderMenuItem() {
-		return self::fileActionsMenuItemFor("View in folder");
-	}
-
-	/**
-	 * @return Locator
-	 */
-	private static function fileActionsMenuItemFor($itemText) {
-		return Locator::forThe()->xpath("//a[normalize-space() = '$itemText']")->
-				descendantOf(self::fileActionsMenu())->
-				describedAs($itemText . " item in file actions menu in Files app");
-	}
-
-	/**
-	 * @Given I open the :section section
-	 */
-	public function iOpenTheSection($section) {
-		$this->actor->find(self::appNavigationSectionItemFor($section), 10)->click();
-	}
-
-	/**
-	 * @Given I open the details view for :fileName
-	 */
-	public function iOpenTheDetailsViewFor($fileName) {
-		$this->actor->find(self::fileActionsMenuButtonForFile($fileName), 10)->click();
-
-		$this->actor->find(self::detailsMenuItem(), 2)->click();
+	public function iCloseTheDetailsView() {
+		$this->actor->find(self::closeDetailsViewButton(), 10)->click();
 	}
 
 	/**
 	 * @Given I open the input field for tags in the details view
 	 */
 	public function iOpenTheInputFieldForTagsInTheDetailsView() {
-		$this->actor->find(self::fileDetailsInCurrentSectionDetailsViewWithText("Tags"), 10)->click();
+		$this->actor->find(self::fileDetailsInDetailsViewWithText("Tags"), 10)->click();
 	}
 
 	/**
 	 * @Given I open the :tabName tab in the details view
 	 */
 	public function iOpenTheTabInTheDetailsView($tabName) {
-		$this->actor->find(self::tabHeaderInCurrentSectionDetailsViewNamed($tabName), 10)->click();
+		$this->actor->find(self::tabHeaderInDetailsViewNamed($tabName), 10)->click();
 	}
 
 	/**
-	 * @Given I mark :fileName as favorite
+	 * @When I mark the file as favorite in the details view
 	 */
-	public function iMarkAsFavorite($fileName) {
-		$this->actor->find(self::favoriteActionForFile($fileName), 10)->click();
+	public function iMarkTheFileAsFavoriteInTheDetailsView() {
+		$this->iSeeThatTheFileIsNotMarkedAsFavoriteInTheDetailsView();
+
+		$this->actor->find(self::favoriteActionInFileDetailsInDetailsView(), 10)->click();
 	}
 
 	/**
-	 * @Given I share the link for :fileName
+	 * @When I unmark the file as favorite in the details view
 	 */
-	public function iShareTheLinkFor($fileName) {
-		$this->actor->find(self::shareActionForFile($fileName), 10)->click();
+	public function iUnmarkTheFileAsFavoriteInTheDetailsView() {
+		$this->iSeeThatTheFileIsMarkedAsFavoriteInTheDetailsView();
 
-		$this->actor->find(self::shareLinkCheckbox(), 5)->click();
+		$this->actor->find(self::favoriteActionInFileDetailsInDetailsView(), 10)->click();
 	}
 
 	/**
-	 * @Given I write down the shared link
+	 * @When I check the tag :tag in the dropdown for tags in the details view
 	 */
-	public function iWriteDownTheSharedLink() {
-		$this->actor->getSharedNotebook()["shared link"] = $this->actor->find(self::shareLinkField(), 10)->getValue();
+	public function iCheckTheTagInTheDropdownForTagsInTheDetailsView($tag) {
+		$this->iSeeThatTheTagInTheDropdownForTagsInTheDetailsViewIsNotChecked($tag);
+
+		$this->actor->find(self::itemInDropdownForTag($tag), 10)->click();
 	}
 
 	/**
-	 * @When I view :fileName in folder
+	 * @When I uncheck the tag :tag in the dropdown for tags in the details view
 	 */
-	public function iViewInFolder($fileName) {
-		$this->actor->find(self::fileActionsMenuButtonForFile($fileName), 10)->click();
+	public function iUncheckTheTagInTheDropdownForTagsInTheDetailsView($tag) {
+		$this->iSeeThatTheTagInTheDropdownForTagsInTheDetailsViewIsChecked($tag);
 
-		$this->actor->find(self::viewFileInFolderMenuItem(), 2)->click();
-	}
-
-	/**
-	 * @When I protect the shared link with the password :password
-	 */
-	public function iProtectTheSharedLinkWithThePassword($password) {
-		$this->actor->find(self::passwordProtectCheckbox(), 10)->click();
-
-		$this->actor->find(self::passwordProtectField(), 2)->setValue($password . "\r");
+		$this->actor->find(self::itemInDropdownForTag($tag), 10)->click();
 	}
 
 	/**
@@ -371,53 +298,59 @@ class FilesAppContext implements Context, ActorAwareInterface {
 		PHPUnit_Framework_Assert::assertStringStartsWith(
 				$this->actor->locatePath("/apps/files/"),
 				$this->actor->getSession()->getCurrentUrl());
+
+		$this->setFileListAncestorForActor(self::currentSectionMainView(), $this->actor);
 	}
 
 	/**
-	 * @Then I see that the current section is :section
+	 * @Then I see that the details view is open
 	 */
-	public function iSeeThatTheCurrentSectionIs($section) {
-		PHPUnit_Framework_Assert::assertEquals($this->actor->find(self::appNavigationCurrentSectionItem(), 10)->getText(), $section);
-	}
-
-	/**
-	 * @Then I see that the details view for :section section is open
-	 */
-	public function iSeeThatTheDetailsViewForSectionIsOpen($section) {
-		PHPUnit_Framework_Assert::assertTrue(
-				$this->actor->find(self::detailsViewForSection($section), 10)->isVisible());
-
-		$otherSections = self::sections();
-		unset($otherSections[$section]);
-
-		$this->assertDetailsViewForSectionsAreClosed($otherSections);
+	public function iSeeThatTheDetailsViewIsOpen() {
+		// The sidebar always exists in the DOM, so it has to be explicitly
+		// waited for it to be visible instead of relying on the implicit wait
+		// made to find the element.
+		if (!WaitFor::elementToBeEventuallyShown(
+				$this->actor,
+				self::detailsView(),
+				$timeout = 10 * $this->actor->getFindTimeoutMultiplier())) {
+			PHPUnit_Framework_Assert::fail("The details view is not open yet after $timeout seconds");
+		}
 	}
 
 	/**
 	 * @Then I see that the details view is closed
 	 */
 	public function iSeeThatTheDetailsViewIsClosed() {
-		PHPUnit_Framework_Assert::assertNotNull($this->actor->find(self::currentSectionMainView(), 10));
-
-		$this->assertDetailsViewForSectionsAreClosed(self::sections());
-	}
-
-	private function assertDetailsViewForSectionsAreClosed($sections) {
-		foreach ($sections as $section => $id) {
-			try {
-				PHPUnit_Framework_Assert::assertFalse(
-						$this->actor->find(self::detailsViewForSection($section))->isVisible(),
-						"Details view for section $section is open but it should be closed");
-			} catch (NoSuchElementException $exception) {
-			}
+		if (!WaitFor::elementToBeEventuallyNotShown(
+				$this->actor,
+				self::detailsView(),
+				$timeout = 10 * $this->actor->getFindTimeoutMultiplier())) {
+			PHPUnit_Framework_Assert::fail("The details view is not closed yet after $timeout seconds");
 		}
 	}
 
 	/**
-	 * @Then I see that :fileName is marked as favorite
+	 * @Then I see that the file name shown in the details view is :fileName
 	 */
-	public function iSeeThatIsMarkedAsFavorite($fileName) {
-		PHPUnit_Framework_Assert::assertNotNull($this->actor->find(self::favoritedStateIconForFile($fileName), 10));
+	public function iSeeThatTheFileNameShownInTheDetailsViewIs($fileName) {
+		PHPUnit_Framework_Assert::assertEquals(
+				$this->actor->find(self::fileNameInDetailsView(), 10)->getText(), $fileName);
+	}
+
+	/**
+	 * @Then I see that the file is marked as favorite in the details view
+	 */
+	public function iSeeThatTheFileIsMarkedAsFavoriteInTheDetailsView() {
+		PHPUnit_Framework_Assert::assertNotNull(
+				$this->actor->find(self::favoritedStateIconInFileDetailsInDetailsView(), 10));
+	}
+
+	/**
+	 * @Then I see that the file is not marked as favorite in the details view
+	 */
+	public function iSeeThatTheFileIsNotMarkedAsFavoriteInTheDetailsView() {
+		PHPUnit_Framework_Assert::assertNotNull(
+				$this->actor->find(self::notFavoritedStateIconInFileDetailsInDetailsView(), 10));
 	}
 
 	/**
@@ -425,55 +358,58 @@ class FilesAppContext implements Context, ActorAwareInterface {
 	 */
 	public function iSeeThatTheInputFieldForTagsInTheDetailsViewIsShown() {
 		PHPUnit_Framework_Assert::assertTrue(
-				$this->actor->find(self::inputFieldForTagsInCurrentSectionDetails(), 10)->isVisible());
+				$this->actor->find(self::inputFieldForTagsInDetailsView(), 10)->isVisible());
+	}
+
+	/**
+	 * @Then I see that the input field for tags in the details view contains the tag :tag
+	 */
+	public function iSeeThatTheInputFieldForTagsInTheDetailsViewContainsTheTag($tag) {
+		PHPUnit_Framework_Assert::assertTrue(
+				$this->actor->find(self::itemInInputFieldForTagsInDetailsViewForTag($tag), 10)->isVisible());
+	}
+
+	/**
+	 * @Then I see that the input field for tags in the details view does not contain the tag :tag
+	 */
+	public function iSeeThatTheInputFieldForTagsInTheDetailsViewDoesNotContainTheTag($tag) {
+		$this->iSeeThatTheInputFieldForTagsInTheDetailsViewIsShown();
+
+		try {
+			PHPUnit_Framework_Assert::assertFalse(
+					$this->actor->find(self::itemInInputFieldForTagsInDetailsViewForTag($tag))->isVisible());
+		} catch (NoSuchElementException $exception) {
+		}
+	}
+
+	/**
+	 * @Then I see that the tag :tag in the dropdown for tags in the details view is checked
+	 */
+	public function iSeeThatTheTagInTheDropdownForTagsInTheDetailsViewIsChecked($tag) {
+		PHPUnit_Framework_Assert::assertTrue(
+				$this->actor->find(self::checkmarkInItemInDropdownForTag($tag), 10)->isVisible());
+	}
+
+	/**
+	 * @Then I see that the tag :tag in the dropdown for tags in the details view is not checked
+	 */
+	public function iSeeThatTheTagInTheDropdownForTagsInTheDetailsViewIsNotChecked($tag) {
+		PHPUnit_Framework_Assert::assertTrue(
+				$this->actor->find(self::itemInDropdownForTag($tag), 10)->isVisible());
+
+		PHPUnit_Framework_Assert::assertFalse(
+				$this->actor->find(self::checkmarkInItemInDropdownForTag($tag))->isVisible());
 	}
 
 	/**
 	 * @When I see that the :tabName tab in the details view is eventually loaded
 	 */
 	public function iSeeThatTheTabInTheDetailsViewIsEventuallyLoaded($tabName) {
-		if (!$this->waitForElementToBeEventuallyNotShown(self::loadingIconForTabInCurrentSectionDetailsViewNamed($tabName), $timeout = 10)) {
+		if (!WaitFor::elementToBeEventuallyNotShown(
+				$this->actor,
+				self::loadingIconForTabInDetailsViewNamed($tabName),
+				$timeout = 10 * $this->actor->getFindTimeoutMultiplier())) {
 			PHPUnit_Framework_Assert::fail("The $tabName tab in the details view has not been loaded after $timeout seconds");
 		}
-	}
-
-	/**
-	 * @Then I see that the working icon for password protect is shown
-	 */
-	public function iSeeThatTheWorkingIconForPasswordProtectIsShown() {
-		PHPUnit_Framework_Assert::assertNotNull($this->actor->find(self::passwordProtectWorkingIcon(), 10));
-	}
-
-	/**
-	 * @Then I see that the working icon for password protect is eventually not shown
-	 */
-	public function iSeeThatTheWorkingIconForPasswordProtectIsEventuallyNotShown() {
-		if (!$this->waitForElementToBeEventuallyNotShown(self::passwordProtectWorkingIcon(), $timeout = 10)) {
-			PHPUnit_Framework_Assert::fail("The working icon for password protect is still shown after $timeout seconds");
-		}
-	}
-
-	/**
-	 * @Given I share the link for :fileName protected by the password :password
-	 */
-	public function iShareTheLinkForProtectedByThePassword($fileName, $password) {
-		$this->iShareTheLinkFor($fileName);
-		$this->iProtectTheSharedLinkWithThePassword($password);
-		$this->iSeeThatTheWorkingIconForPasswordProtectIsShown();
-		$this->iSeeThatTheWorkingIconForPasswordProtectIsEventuallyNotShown();
-	}
-
-	private function waitForElementToBeEventuallyNotShown($elementLocator, $timeout = 10, $timeoutStep = 1) {
-		$actor = $this->actor;
-
-		$elementNotFoundCallback = function() use ($actor, $elementLocator) {
-			try {
-				return !$actor->find($elementLocator)->isVisible();
-			} catch (NoSuchElementException $exception) {
-				return true;
-			}
-		};
-
-		return Utils::waitFor($elementNotFoundCallback, $timeout, $timeoutStep);
 	}
 }

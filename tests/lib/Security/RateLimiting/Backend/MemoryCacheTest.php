@@ -28,16 +28,16 @@ use OCP\ICacheFactory;
 use Test\TestCase;
 
 class MemoryCacheTest extends TestCase {
-	/** @var ICacheFactory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ICacheFactory|\PHPUnit\Framework\MockObject\MockObject */
 	private $cacheFactory;
-	/** @var ITimeFactory|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ITimeFactory|\PHPUnit\Framework\MockObject\MockObject */
 	private $timeFactory;
-	/** @var ICache|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ICache|\PHPUnit\Framework\MockObject\MockObject */
 	private $cache;
 	/** @var MemoryCache */
 	private $memoryCache;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->cacheFactory = $this->createMock(ICacheFactory::class);
@@ -46,7 +46,7 @@ class MemoryCacheTest extends TestCase {
 
 		$this->cacheFactory
 			->expects($this->once())
-			->method('create')
+			->method('createDistributed')
 			->with('OC\Security\RateLimiting\Backend\MemoryCache')
 			->willReturn($this->cache);
 
@@ -61,7 +61,7 @@ class MemoryCacheTest extends TestCase {
 			->expects($this->once())
 			->method('get')
 			->with('eea460b8d756885099c7f0a4c083bf6a745069ee4a301984e726df58fd4510bffa2dac4b7fd5d835726a6753ffa8343ba31c7e902bbef78fc68c2e743667cb4b')
-			->willReturn(false);
+			->willReturn(null);
 
 		$this->assertSame(0, $this->memoryCache->getAttempts('Method', 'User', 123));
 	}
@@ -97,7 +97,7 @@ class MemoryCacheTest extends TestCase {
 			->expects($this->once())
 			->method('get')
 			->with('eea460b8d756885099c7f0a4c083bf6a745069ee4a301984e726df58fd4510bffa2dac4b7fd5d835726a6753ffa8343ba31c7e902bbef78fc68c2e743667cb4b')
-			->willReturn(false);
+			->willReturn(null);
 		$this->cache
 			->expects($this->once())
 			->method('set')

@@ -2,8 +2,11 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Arthur Schiwon <blizzz@arthur-schiwon.de>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  * @author Joas Schilling <coding@schilljs.com>
- * @author Vincent Petry <pvince81@owncloud.com>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
+ * @author Vincent Petry <vincent@nextcloud.com>
  *
  * @license AGPL-3.0
  *
@@ -17,7 +20,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -33,7 +36,6 @@ use OCP\IGroup;
 use OCP\IGroupManager;
 use OCP\IUser;
 use OCP\IUserSession;
-use OCP\Share;
 use OCP\Share\IShareHelper;
 use OCP\SystemTag\ISystemTag;
 use OCP\SystemTag\ISystemTagManager;
@@ -110,19 +112,19 @@ class Listener {
 		$activity->setApp('systemtags')
 			->setType('systemtags')
 			->setAuthor($actor)
-			->setObject('systemtag', $tag->getId(), $tag->getName());
+			->setObject('systemtag', (int)$tag->getId(), $tag->getName());
 		if ($event->getEvent() === ManagerEvent::EVENT_CREATE) {
 			$activity->setSubject(Provider::CREATE_TAG, [
 				$actor,
 				$this->prepareTagAsParameter($event->getTag()),
 			]);
-		} else if ($event->getEvent() === ManagerEvent::EVENT_UPDATE) {
+		} elseif ($event->getEvent() === ManagerEvent::EVENT_UPDATE) {
 			$activity->setSubject(Provider::UPDATE_TAG, [
 				$actor,
 				$this->prepareTagAsParameter($event->getTag()),
 				$this->prepareTagAsParameter($event->getTagBefore()),
 			]);
-		} else if ($event->getEvent() === ManagerEvent::EVENT_DELETE) {
+		} elseif ($event->getEvent() === ManagerEvent::EVENT_DELETE) {
 			$activity->setSubject(Provider::DELETE_TAG, [
 				$actor,
 				$this->prepareTagAsParameter($event->getTag()),
@@ -150,7 +152,7 @@ class Listener {
 	 */
 	public function mapperEvent(MapperEvent $event) {
 		$tagIds = $event->getTags();
-		if ($event->getObjectType() !== 'files' ||empty($tagIds)
+		if ($event->getObjectType() !== 'files' || empty($tagIds)
 			|| !in_array($event->getEvent(), [MapperEvent::EVENT_ASSIGN, MapperEvent::EVENT_UNASSIGN])
 			|| !$this->appManager->isInstalled('activity')) {
 			// System tags not for files, no tags, not (un-)assigning or no activity-app enabled (save the energy)
@@ -184,7 +186,7 @@ class Listener {
 				/** @var Node $node */
 				$node = array_shift($nodes);
 				$al = $this->shareHelper->getPathsForAccessList($node);
-				$users = array_merge($users, $al['users']);
+				$users += $al['users'];
 			}
 		}
 
@@ -202,6 +204,7 @@ class Listener {
 			->setObject($event->getObjectType(), (int) $event->getObjectId());
 
 		foreach ($users as $user => $path) {
+			$user = (string)$user; // numerical ids could be ints which are not accepted everywhere
 			$activity->setAffectedUser($user);
 
 			foreach ($tags as $tag) {
@@ -215,7 +218,7 @@ class Listener {
 						$path,
 						$this->prepareTagAsParameter($tag),
 					]);
-				} else if ($event->getEvent() === MapperEvent::EVENT_UNASSIGN) {
+				} elseif ($event->getEvent() === MapperEvent::EVENT_UNASSIGN) {
 					$activity->setSubject(Provider::UNASSIGN_TAG, [
 						$actor,
 						$path,

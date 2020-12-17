@@ -2,11 +2,12 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Bjoern Schiessle <bjoern@schiessle.org>
  * @author Björn Schießle <bjoern@schiessle.org>
  * @author Joas Schilling <coding@schilljs.com>
- * @author Lukas Reschke <lukas@statuscode.ch>
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license AGPL-3.0
  *
@@ -20,17 +21,16 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
 namespace OCA\Files_Sharing;
 
 use OC\Files\Filesystem;
-use OCA\FederatedFileSharing\DiscoveryManager;
+use OCP\EventDispatcher\IEventDispatcher;
 
 class Hooks {
-
 	public static function deleteUser($params) {
 		$manager = new External\Manager(
 			\OC::$server->getDatabaseConnection(),
@@ -39,7 +39,13 @@ class Hooks {
 			\OC::$server->getHTTPClientService(),
 			\OC::$server->getNotificationManager(),
 			\OC::$server->query(\OCP\OCS\IDiscoveryService::class),
-			$params['uid']);
+			\OC::$server->getCloudFederationProviderManager(),
+			\OC::$server->getCloudFederationFactory(),
+			\OC::$server->getGroupManager(),
+			\OC::$server->getUserManager(),
+			$params['uid'],
+			\OC::$server->query(IEventDispatcher::class)
+		);
 
 		$manager->removeUserShares($params['uid']);
 	}
@@ -52,7 +58,7 @@ class Hooks {
 		$mountManager = \OC\Files\Filesystem::getMountManager();
 		$mountedShares = $mountManager->findIn($path);
 		foreach ($mountedShares as $mount) {
-			if ($mount->getStorage()->instanceOfStorage('OCA\Files_Sharing\ISharedStorage')) {
+			if ($mount->getStorage()->instanceOfStorage(ISharedStorage::class)) {
 				$mountPoint = $mount->getMountPoint();
 				$view->unlink($mountPoint);
 			}

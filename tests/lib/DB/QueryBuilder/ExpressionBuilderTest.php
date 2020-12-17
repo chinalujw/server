@@ -43,12 +43,14 @@ class ExpressionBuilderTest extends TestCase {
 	/** @var \Doctrine\DBAL\Connection|\OCP\IDBConnection */
 	protected $connection;
 
-	protected function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->connection = \OC::$server->getDatabaseConnection();
 
-		$this->expressionBuilder = new ExpressionBuilder($this->connection);
+		$queryBuilder = $this->createMock(IQueryBuilder::class);
+
+		$this->expressionBuilder = new ExpressionBuilder($this->connection, $queryBuilder);
 
 		$this->doctrineExpressionBuilder = new DoctrineExpressionBuilder($this->connection);
 	}
@@ -398,7 +400,7 @@ class ExpressionBuilderTest extends TestCase {
 		$this->createConfig($appId, 11, 'underscore');
 
 		$query = $this->connection->getQueryBuilder();
-		$query->select($query->createFunction('COUNT(*) AS `count`'))
+		$query->select($query->func()->count('*', 'count'))
 			->from('appconfig')
 			->where($query->expr()->eq('appid', $query->createNamedParameter($appId)))
 			->andWhere(call_user_func([$query->expr(), $function], 'configvalue', $query->createNamedParameter($value, $type), IQueryBuilder::PARAM_STR));

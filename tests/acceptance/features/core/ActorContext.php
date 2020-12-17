@@ -132,10 +132,10 @@ class ActorContext extends RawMinkContext {
 	 * are used in an "I act as XXX" step.
 	 */
 	public function initializeActors() {
-		$this->actors = array();
-		$this->sharedNotebook = array();
+		$this->actors = [];
+		$this->sharedNotebook = [];
 
-		$this->actors["default"] = new Actor($this->getSession(), $this->getMinkParameter("base_url"), $this->sharedNotebook);
+		$this->actors["default"] = new Actor("default", $this->getSession(), $this->getMinkParameter("base_url"), $this->sharedNotebook);
 		$this->actors["default"]->setFindTimeoutMultiplier($this->actorTimeoutMultiplier);
 
 		$this->currentActor = $this->actors["default"];
@@ -159,11 +159,19 @@ class ActorContext extends RawMinkContext {
 	 */
 	public function iActAs($actorName) {
 		if (!array_key_exists($actorName, $this->actors)) {
-			$this->actors[$actorName] = new Actor($this->getSession($actorName), $this->getMinkParameter("base_url"), $this->sharedNotebook);
+			$this->actors[$actorName] = new Actor($actorName, $this->getSession($actorName), $this->getMinkParameter("base_url"), $this->sharedNotebook);
 			$this->actors[$actorName]->setFindTimeoutMultiplier($this->actorTimeoutMultiplier);
 		}
 
 		$this->currentActor = $this->actors[$actorName];
+
+		// Ensure that the browser window of the actor is the one in the
+		// foreground; this works around a bug in the Firefox driver of Selenium
+		// and/or maybe in Firefox itself when interacting with a window in the
+		// background, but also reflects better how the user would interact with
+		// the browser in real life.
+		$session = $this->actors[$actorName]->getSession();
+		$session->switchToWindow($session->getWindowName());
 	}
 
 	/**
@@ -176,5 +184,4 @@ class ActorContext extends RawMinkContext {
 			$actor->getSession()->stop();
 		}
 	}
-
 }

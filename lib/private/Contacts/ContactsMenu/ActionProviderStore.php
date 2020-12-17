@@ -1,9 +1,8 @@
 <?php
-
 /**
  * @copyright 2017 Christoph Wurst <christoph@winzerhof-wurst.at>
  *
- * @author 2017 Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
  *
  * @license GNU AGPL version 3 or any later version
  *
@@ -18,7 +17,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -95,7 +94,7 @@ class ActionProviderStore {
 	 * @return string[]
 	 */
 	private function getAppProviderClasses(IUser $user) {
-		return array_reduce($this->appManager->getEnabledAppsForUser($user), function($all, $appId) {
+		return array_reduce($this->appManager->getEnabledAppsForUser($user), function ($all, $appId) {
 			$info = $this->appManager->getAppInfo($appId);
 
 			if (!isset($info['contactsmenu']) || !isset($info['contactsmenu'])) {
@@ -103,12 +102,11 @@ class ActionProviderStore {
 				return $all;
 			}
 
-			$providers = array_reduce($info['contactsmenu'], function($all, $provider) {
+			$providers = array_reduce($info['contactsmenu'], function ($all, $provider) {
 				return array_merge($all, [$provider]);
 			}, []);
 
 			return array_merge($all, $providers);
 		}, []);
 	}
-
 }

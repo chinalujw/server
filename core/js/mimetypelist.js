@@ -4,7 +4,7 @@
 *
 * You can update the list of MimeType Aliases in config/mimetypealiases.json
 * The list of files is fetched from core/img/filetypes
-* To regenerate this file run ./occ maintenance:mimetypesjs
+* To regenerate this file run ./occ maintenance:mimetype:update-js
 */
 OC.MimeTypeList={
 	aliases: {
@@ -40,6 +40,12 @@ OC.MimeTypeList={
     "application/vnd.ms-powerpoint.presentation.macroEnabled.12": "x-office/presentation",
     "application/vnd.ms-powerpoint.slideshow.macroEnabled.12": "x-office/presentation",
     "application/vnd.ms-powerpoint.template.macroEnabled.12": "x-office/presentation",
+    "application/vnd.ms-visio.drawing.macroEnabled.12": "application/vnd.visio",
+    "application/vnd.ms-visio.drawing": "application/vnd.visio",
+    "application/vnd.ms-visio.stencil.macroEnabled.12": "application/vnd.visio",
+    "application/vnd.ms-visio.stencil": "application/vnd.visio",
+    "application/vnd.ms-visio.template.macroEnabled.12": "application/vnd.visio",
+    "application/vnd.ms-visio.template": "application/vnd.visio",
     "application/vnd.ms-word.document.macroEnabled.12": "x-office/document",
     "application/vnd.ms-word.template.macroEnabled.12": "x-office/document",
     "application/vnd.oasis.opendocument.presentation": "x-office/presentation",
@@ -94,7 +100,11 @@ OC.MimeTypeList={
     "text/x-ldif": "text/code",
     "text/x-python": "text/code",
     "text/x-shellscript": "text/code",
-    "web": "text/code"
+    "web": "text/code",
+    "application/internet-shortcut": "link",
+    "application/km": "mindmap",
+    "application/x-freemind": "mindmap",
+    "application/vnd.xmind.workbook": "mindmap"
 },
 	files: [
     "application",
@@ -103,12 +113,15 @@ OC.MimeTypeList={
     "file",
     "folder",
     "folder-drag-accept",
+    "folder-encrypted",
     "folder-external",
     "folder-public",
     "folder-shared",
     "folder-starred",
     "image",
+    "link",
     "location",
+    "mindmap",
     "package-x-generic",
     "text",
     "text-calendar",

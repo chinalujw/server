@@ -2,7 +2,10 @@
 /**
  * @copyright Copyright (c) 2016, ownCloud, Inc.
  *
+ * @author Arthur Schiwon <blizzz@arthur-schiwon.de>
  * @author Joas Schilling <coding@schilljs.com>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license AGPL-3.0
  *
@@ -16,7 +19,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -30,7 +33,6 @@ use OCP\Files\IRootFolder;
 use OCP\Files\Node;
 use OCP\IUser;
 use OCP\IUserSession;
-use OCP\Share;
 use OCP\Share\IShareHelper;
 
 class Listener {
@@ -76,7 +78,7 @@ class Listener {
 	 */
 	public function commentEvent(CommentsEvent $event) {
 		if ($event->getComment()->getObjectType() !== 'files'
-			|| !in_array($event->getEvent(), [CommentsEvent::EVENT_ADD])
+			|| $event->getEvent() !== CommentsEvent::EVENT_ADD
 			|| !$this->appManager->isInstalled('activity')) {
 			// Comment not for file, not adding a comment or no activity-app enabled (save the energy)
 			return;
@@ -84,7 +86,7 @@ class Listener {
 
 		// Get all mount point owners
 		$cache = $this->mountCollection->getMountCache();
-		$mounts = $cache->getMountsForFileId($event->getComment()->getObjectId());
+		$mounts = $cache->getMountsForFileId((int)$event->getComment()->getObjectId());
 		if (empty($mounts)) {
 			return;
 		}
@@ -93,12 +95,12 @@ class Listener {
 		foreach ($mounts as $mount) {
 			$owner = $mount->getUser()->getUID();
 			$ownerFolder = $this->rootFolder->getUserFolder($owner);
-			$nodes = $ownerFolder->getById($event->getComment()->getObjectId());
+			$nodes = $ownerFolder->getById((int)$event->getComment()->getObjectId());
 			if (!empty($nodes)) {
 				/** @var Node $node */
 				$node = array_shift($nodes);
 				$al = $this->shareHelper->getPathsForAccessList($node);
-				$users = array_merge($users, $al['users']);
+				$users += $al['users'];
 			}
 		}
 
@@ -115,15 +117,18 @@ class Listener {
 			->setAuthor($actor)
 			->setObject($event->getComment()->getObjectType(), (int) $event->getComment()->getObjectId())
 			->setMessage('add_comment_message', [
-				$event->getComment()->getId(),
+				'commentId' => $event->getComment()->getId(),
 			]);
 
 		foreach ($users as $user => $path) {
-			$activity->setAffectedUser($user);
+			// numerical user ids end up as integers from array keys, but string
+			// is required
+			$activity->setAffectedUser((string)$user);
 
 			$activity->setSubject('add_comment_subject', [
-				$actor,
-				$path,
+				'actor' => $actor,
+				'fileId' => (int) $event->getComment()->getObjectId(),
+				'filePath' => trim($path, '/'),
 			]);
 			$this->activityManager->publish($activity);
 		}

@@ -1,8 +1,11 @@
 <?php
 /**
+ * @copyright Copyright (c) 2017, ownCloud GmbH
+ *
+ * @author Joas Schilling <coding@schilljs.com>
+ * @author Morris Jobke <hey@morrisjobke.de>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
- * @copyright Copyright (c) 2017, ownCloud GmbH
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -15,7 +18,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
@@ -66,7 +69,7 @@ class ConvertMysqlToMB4 extends Command {
 			->setDescription('Convert charset of MySQL/MariaDB to use utf8mb4');
 	}
 
-	protected function execute(InputInterface $input, OutputInterface $output) {
+	protected function execute(InputInterface $input, OutputInterface $output): int {
 		if (!$this->connection->getDatabasePlatform() instanceof MySqlPlatform) {
 			$output->writeln("This command is only valid for MySQL/MariaDB databases.");
 			return 1;

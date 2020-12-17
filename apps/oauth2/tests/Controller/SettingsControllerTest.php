@@ -2,6 +2,12 @@
 /**
  * @copyright Copyright (c) 2017 Lukas Reschke <lukas@statuscode.ch>
  *
+ * @author Christoph Wurst <christoph@winzerhof-wurst.at>
+ * @author Lukas Reschke <lukas@statuscode.ch>
+ * @author Morris Jobke <hey@morrisjobke.de>
+ * @author rakekniven <mark.ziegler@rakekniven.de>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
+ *
  * @license GNU AGPL version 3 or any later version
  *
  * This program is free software: you can redistribute it and/or modify
@@ -15,7 +21,7 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,46 +32,47 @@ use OCA\OAuth2\Controller\SettingsController;
 use OCA\OAuth2\Db\AccessTokenMapper;
 use OCA\OAuth2\Db\Client;
 use OCA\OAuth2\Db\ClientMapper;
-use OCP\AppFramework\Http\RedirectResponse;
+use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\JSONResponse;
+use OCP\IL10N;
 use OCP\IRequest;
-use OCP\IURLGenerator;
 use OCP\Security\ISecureRandom;
 use Test\TestCase;
 
 class SettingsControllerTest extends TestCase {
-	/** @var IRequest|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var IRequest|\PHPUnit\Framework\MockObject\MockObject */
 	private $request;
-	/** @var IURLGenerator|\PHPUnit_Framework_MockObject_MockObject */
-	private $urlGenerator;
-	/** @var ClientMapper|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ClientMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $clientMapper;
-	/** @var ISecureRandom|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var ISecureRandom|\PHPUnit\Framework\MockObject\MockObject */
 	private $secureRandom;
-	/** @var AccessTokenMapper|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var AccessTokenMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $accessTokenMapper;
-	/** @var DefaultTokenMapper|\PHPUnit_Framework_MockObject_MockObject */
+	/** @var DefaultTokenMapper|\PHPUnit\Framework\MockObject\MockObject */
 	private $defaultTokenMapper;
 	/** @var SettingsController */
 	private $settingsController;
 
-	public function setUp() {
+	protected function setUp(): void {
 		parent::setUp();
 
 		$this->request = $this->createMock(IRequest::class);
-		$this->urlGenerator = $this->createMock(IURLGenerator::class);
 		$this->clientMapper = $this->createMock(ClientMapper::class);
 		$this->secureRandom = $this->createMock(ISecureRandom::class);
 		$this->accessTokenMapper = $this->createMock(AccessTokenMapper::class);
 		$this->defaultTokenMapper = $this->createMock(DefaultTokenMapper::class);
+		$l = $this->createMock(IL10N::class);
+		$l->method('t')
+			->willReturnArgument(0);
 
 		$this->settingsController = new SettingsController(
 			'oauth2',
 			$this->request,
-			$this->urlGenerator,
 			$this->clientMapper,
 			$this->secureRandom,
 			$this->accessTokenMapper,
-			$this->defaultTokenMapper
+			$this->defaultTokenMapper,
+			$l
 		);
 	}
 
@@ -90,27 +97,39 @@ class SettingsControllerTest extends TestCase {
 		$this->clientMapper
 			->expects($this->once())
 			->method('insert')
-			->with($client);
+			->with($this->callback(function (Client $c) {
+				return $c->getName() === 'My Client Name' &&
+					$c->getRedirectUri() === 'https://example.com/' &&
+					$c->getSecret() === 'MySecret' &&
+					$c->getClientIdentifier() === 'MyClientIdentifier';
+			}))->willReturnCallback(function (Client $c) {
+				$c->setId(42);
+				return $c;
+			});
 
-		$this->urlGenerator
-			->expects($this->once())
-			->method('getAbsoluteURL')
-			->with('/index.php/settings/admin/security')
-			->willReturn('https://example.com/index.php/settings/admin/security');
+		$result = $this->settingsController->addClient('My Client Name', 'https://example.com/');
+		$this->assertInstanceOf(JSONResponse::class, $result);
 
-		$expected = new RedirectResponse('https://example.com/index.php/settings/admin/security');
-		$this->assertEquals($expected, $this->settingsController->addClient('My Client Name', 'https://example.com/'));
+		$data = $result->getData();
+
+		$this->assertEquals([
+			'id' => 42,
+			'name' => 'My Client Name',
+			'redirectUri' => 'https://example.com/',
+			'clientId' => 'MyClientIdentifier',
+			'clientSecret' => 'MySecret',
+		], $data);
 	}
 
 	public function testDeleteClient() {
 		$client = new Client();
+		$client->setId(123);
 		$client->setName('My Client Name');
 		$client->setRedirectUri('https://example.com/');
 		$client->setSecret('MySecret');
 		$client->setClientIdentifier('MyClientIdentifier');
 
 		$this->clientMapper
-			->expects($this->at(0))
 			->method('getByUid')
 			->with(123)
 			->willReturn($client);
@@ -123,17 +142,18 @@ class SettingsControllerTest extends TestCase {
 			->method('deleteByName')
 			->with('My Client Name');
 		$this->clientMapper
-			->expects($this->at(1))
 			->method('delete')
 			->with($client);
 
-		$this->urlGenerator
-			->expects($this->once())
-			->method('getAbsoluteURL')
-			->with('/index.php/settings/admin/security')
-			->willReturn('https://example.com/index.php/settings/admin/security');
+		$result = $this->settingsController->deleteClient(123);
+		$this->assertInstanceOf(JSONResponse::class, $result);
+		$this->assertEquals([], $result->getData());
+	}
 
-		$expected = new RedirectResponse('https://example.com/index.php/settings/admin/security');
-		$this->assertEquals($expected, $this->settingsController->deleteClient(123));
+	public function testInvalidRedirectUri() {
+		$result = $this->settingsController->addClient('test', 'invalidurl');
+
+		$this->assertEquals(Http::STATUS_BAD_REQUEST, $result->getStatus());
+		$this->assertSame(['message' => 'Your redirect URL needs to be a full URL for example: https://yourdomain.com/path'], $result->getData());
 	}
 }

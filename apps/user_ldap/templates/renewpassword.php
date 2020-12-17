@@ -1,29 +1,22 @@
-<?php /** @var $l OC_L10N */ ?>
+<?php /** @var \OCP\IL10N $l */ ?>
 <?php
-script('core', [
-	'jquery-showpassword',
-]);
 script('user_ldap', [
 	'renewPassword',
 ]);
 style('user_ldap', 'renewPassword');
-\OC_Util::addVendorScript('strengthify/jquery.strengthify');
-\OC_Util::addVendorStyle('strengthify/strengthify');
-
 ?>
 
-<!--[if IE 8]><style>input[type="checkbox"]{padding:0;}</style><![endif]-->
 <form method="post" name="renewpassword" id="renewpassword" action="<?php p(\OC::$server->getURLGenerator()->linkToRoute('user_ldap.renewPassword.tryRenewPassword')); ?>">
 	<fieldset>
 		<div class="warning title">
 			<?php p($l->t('Please renew your password.')); ?><br>
 		</div>
-		<?php foreach($_['messages'] as $message): ?>
+		<?php foreach ($_['messages'] as $message): ?>
 			<div class="warning">
 				<?php p($message); ?><br>
 			</div>
 		<?php endforeach; ?>
-		<?php if (isset($_['internalexception']) && ($_['internalexception'])): ?>
+		<?php if (isset($_['internalexception']) && $_['internalexception']): ?>
 			<div class="warning">
 				<?php p($l->t('An internal error occurred.')); ?><br>
 				<small><?php p($l->t('Please try again or contact your administrator.')); ?></small>
@@ -44,7 +37,7 @@ style('user_ldap', 'renewPassword');
 		</p>
 
 		<p class="groupbottom">
-			<input type="checkbox" id="personal-show" name="show" /><label for="personal-show"></label>
+			<input type="checkbox" id="personal-show" name="show" class="hidden-visually" /><label for="personal-show"></label>
 			<label id="newPassword-label" for="newPassword" class="infield"><?php p($l->t('New password')); ?></label>
 			<input type="password" id="newPassword" name="newPassword"
 				placeholder="<?php echo $l->t('New password');?>"
@@ -53,11 +46,7 @@ style('user_ldap', 'renewPassword');
 		
 		<input type="submit" id="submit" class="login primary icon-confirm-white" title="" value="<?php p($l->t('Renew password')); ?>"/>
 
-		<?php if (!empty($_['invalidpassword']) && !empty($_['canResetPassword'])) { ?>
-		<a id="lost-password" class="warning" href="<?php p($_['resetPasswordLink']); ?>">
-			<?php p($l->t('Wrong password. Reset it?')); ?>
-		</a>
-		<?php } else if (!empty($_['invalidpassword'])) { ?>
+		<?php if (!empty($_['invalidpassword'])) { ?>
 			<p class="warning">
 				<?php p($l->t('Wrong password.')); ?>
 			</p>

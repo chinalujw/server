@@ -5,6 +5,7 @@
  * @author Morris Jobke <hey@morrisjobke.de>
  * @author Robin Appelman <robin@icewind.nl>
  * @author Robin McCorkell <robin@mccorkell.me.uk>
+ * @author Roeland Jago Douma <roeland@famdouma.nl>
  *
  * @license AGPL-3.0
  *
@@ -18,20 +19,20 @@
  * GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License, version 3,
- * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ * along with this program. If not, see <http://www.gnu.org/licenses/>
  *
  */
 
 namespace OCA\Files_External\Lib;
 
-use OC\Files\Mount\MountPoint;
 use OC\Files\Mount\MoveableMount;
+use OCA\Files_External\Config\ExternalMountPoint;
 use OCA\Files_External\Service\UserStoragesService;
 
 /**
  * Person mount points can be moved by the user
  */
-class PersonalMount extends MountPoint implements MoveableMount {
+class PersonalMount extends ExternalMountPoint implements MoveableMount {
 	/** @var UserStoragesService */
 	protected $storagesService;
 
@@ -54,9 +55,10 @@ class PersonalMount extends MountPoint implements MoveableMount {
 		$mountpoint,
 		$arguments = null,
 		$loader = null,
-		$mountOptions = null
+		$mountOptions = null,
+		$mountId = null
 	) {
-		parent::__construct($storage, $mountpoint, $arguments, $loader, $mountOptions);
+		parent::__construct($storage, $mountpoint, $arguments, $loader, $mountOptions, $mountId);
 		$this->storagesService = $storagesService;
 		$this->numericStorageId = $storageId;
 	}
